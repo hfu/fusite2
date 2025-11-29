@@ -24,16 +24,16 @@
 
 ```
 # デフォルト（島原周辺、OSMテーマ、fusi地形）
-https://example.com/fusite2/
+https://hfu.github.io/fusite2/
 
 # 東京周辺をGSIテーマで表示
-https://example.com/fusite2/#map=14/35.6812/139.7671/45/0&terrain=fusi&theme=gsi
+https://hfu.github.io/fusite2/#map=14/35.6812/139.7671/45/0&terrain=fusi&theme=gsi
 
 # いわき周辺を等高線テーマで表示
-https://example.com/fusite2/#map=13/37.0/140.9/30/0&terrain=iwaki&theme=contour
+https://hfu.github.io/fusite2/#map=13/37.0/140.9/30/0&terrain=iwaki&theme=contour
 
 # 島原を異なる地形データで表示
-https://example.com/fusite2/#map=14/32.75/129.87/20/0&terrain=shimabara&theme=osm
+https://hfu.github.io/fusite2/#map=14/32.75/129.87/20/0&terrain=shimabara&theme=osm
 ```
 
 ## データソース
