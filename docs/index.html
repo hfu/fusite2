@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="utf-8" />
+    <title>fusite2 - 標高タイル可視化</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="国土地理院の標高データを WebP Terrarium タイルとして可視化 - 拡張版" />
+
+    <!-- MapLibre GL JS -->
+    <script src="https://unpkg.com/maplibre-gl@5.7.0/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@5.7.0/dist/maplibre-gl.css" rel="stylesheet" />
+
+    <!-- maplibre-contour for contour theme -->
+    <script src="https://unpkg.com/maplibre-contour@0.0.5/dist/index.min.js"></script>
+
+    <link href="style.css" rel="stylesheet" />
+</head>
+
+<body class="has-info-toggle">
+    <div id="map"></div>
+
+    <button id="info-toggle" class="info-toggle" aria-expanded="false" aria-controls="info-panel" title="情報を開く">ℹ️</button>
+
+    <div id="info-panel" class="info-panel hidden" aria-hidden="true">
+        <h1>fusite2 標高タイル</h1>
+        <p id="info-description">国土地理院の標高データを Terrarium 形式で可視化</p>
+        <p class="attribution">
+            データ: <a href="https://www.gsi.go.jp/" target="_blank" rel="noopener noreferrer">国土地理院 (GSI Japan)</a><br>
+            測量法に基づく国土地理院長承認（使用）R 6JHs 133<br>
+            <br>
+            Inspired by <a href="https://github.com/mapterhorn/mapterhorn" target="_blank"
+                rel="noopener noreferrer">Mapterhorn</a><br>
+            Made with <a href="https://github.com/hfu/fusite2" target="_blank" rel="noopener noreferrer">fusite2</a>
+        </p>
+    </div>
+
+    <script type="text/javascript">
+        /**
+         * Parse URL fragment parameters
+         * Format: #map=z/lat/lng&terrain=xxx&theme=yyy
+         */
+        function parseHashParams() {
+            const hash = window.location.hash.substring(1);
+            const params = {};
+
+            if (!hash) return params;
+
+            // Split by & and parse each parameter
+            hash.split('&').forEach(part => {
+                const [key, value] = part.split('=');
+                if (key && value !== undefined) {
+                    params[key] = value;
+                }
+            });
+
+            return params;
+        }
+
+        /**
+         * Update URL fragment without triggering hashchange
+         */
+        function updateHashParams(newParams) {
+            const currentParams = parseHashParams();
+            const mergedParams = { ...currentParams, ...newParams };
+
+            const hashParts = [];
+            for (const [key, value] of Object.entries(mergedParams)) {
+                if (value !== undefined && value !== null) {
+                    hashParts.push(`${key}=${value}`);
+                }
+            }
+
+            const newHash = hashParts.join('&');
+            if (window.location.hash.substring(1) !== newHash) {
+                history.replaceState(null, '', '#' + newHash);
+            }
+        }
+
+        // Parse initial parameters
+        const hashParams = parseHashParams();
+        const terrain = hashParams.terrain || 'fusi';
+        const theme = hashParams.theme || 'osm';
+
+        // TileJSON URL for terrain
+        const terrainTileJsonUrl = `https://tunnel.optgeo.org/martin/${terrain}`;
+
+        /**
+         * Build the style object based on theme and terrain
+         */
+        async function buildStyle(terrainTileJsonUrl, theme) {
+            // Fetch TileJSON to get tile URL
+            let terrainTiles;
+            try {
+                const response = await fetch(terrainTileJsonUrl);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch TileJSON: ${response.status}`);
+                }
+                const tileJson = await response.json();
+                terrainTiles = tileJson.tiles;
+            } catch (error) {
+                console.error('Error fetching TileJSON:', error);
+                // Fallback to default tile URL pattern
+                terrainTiles = [`${terrainTileJsonUrl}/{z}/{x}/{y}`];
+            }
+
+            const style = {
+                version: 8,
+                glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+                sources: {
+                    terrainSource: {
+                        type: 'raster-dem',
+                        tiles: terrainTiles,
+                        encoding: 'terrarium',
+                        tileSize: 512,
+                        minzoom: 0,
+                        maxzoom: 16
+                    }
+                },
+                layers: [],
+                terrain: {
+                    source: 'terrainSource'
+                }
+            };
+
+            // Add theme-specific sources and layers
+            if (theme === 'osm') {
+                return buildOsmStyle(style);
+            } else if (theme === 'gsi') {
+                return buildGsiStyle(style);
+            } else if (theme === 'contour') {
+                return buildContourStyle(style, terrainTiles[0]);
+            }
+
+            // Default to osm
+            return buildOsmStyle(style);
+        }
+
+        /**
+         * OSM theme style (reproduces osm.html)
+         */
+        function buildOsmStyle(style) {
+            style.sources.osm = {
+                type: 'raster',
+                tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                tileSize: 256,
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                maxzoom: 19
+            };
+
+            style.layers = [
+                {
+                    id: 'background',
+                    type: 'background',
+                    paint: {
+                        'background-color': '#e0e0e0'
+                    }
+                },
+                {
+                    id: 'osm',
+                    type: 'raster',
+                    source: 'osm',
+                    paint: {
+                        'raster-opacity': 0.7
+                    }
+                },
+                {
+                    id: 'hillshade',
+                    type: 'hillshade',
+                    source: 'terrainSource',
+                    paint: {
+                        'hillshade-exaggeration': 0.3,
+                        'hillshade-shadow-color': '#473B24'
+                    }
+                }
+            ];
+
+            style.terrain.exaggeration = 1.5;
+
+            style.sky = {
+                'sky-color': '#87CEEB',
+                'sky-horizon-blend': 0.5,
+                'horizon-color': '#ffffff',
+                'horizon-fog-blend': 0.5,
+                'fog-color': '#ffffff',
+                'fog-ground-blend': 0.5
+            };
+
+            return style;
+        }
+
+        /**
+         * GSI theme style (reproduces index.html with bvmap)
+         */
+        function buildGsiStyle(style) {
+            style.sources.bvmap = {
+                type: 'vector',
+                url: 'https://tunnel.optgeo.org/martin/bvmap'
+            };
+
+            style.layers = [
+                {
+                    id: 'background',
+                    type: 'background',
+                    paint: {
+                        'background-color': '#e0e0e0'
+                    }
+                },
+                {
+                    id: 'hillshade',
+                    type: 'hillshade',
+                    source: 'terrainSource',
+                    paint: {
+                        'hillshade-exaggeration': 0.2,
+                        'hillshade-highlight-color': 'rgb(255,255,235)',
+                        'hillshade-shadow-color': 'rgb(110,120,130)'
+                    }
+                },
+                {
+                    id: '行政区画',
+                    type: 'fill',
+                    source: 'bvmap',
+                    'source-layer': 'AdmArea',
+                    paint: {
+                        'fill-color': 'rgba(255,255,255,0)',
+                        'fill-outline-color': 'rgba(110,120,130,1)'
+                    }
+                },
+                {
+                    id: '水域',
+                    maxzoom: 17,
+                    type: 'fill',
+                    source: 'bvmap',
+                    'source-layer': 'WA',
+                    paint: {
+                        'fill-color': 'rgba(0,0,0,0)',
+                        'fill-outline-color': 'rgba(110,120,130,1)'
+                    }
+                },
+                {
+                    id: '地形表記面',
+                    type: 'fill',
+                    source: 'bvmap',
+                    maxzoom: 17,
+                    'source-layer': 'TpgphArea',
+                    paint: {
+                        'fill-color': 'rgba(0,0,0,0)',
+                        'fill-outline-color': 'rgba(110,120,130,1)'
+                    }
+                },
+                {
+                    id: '地形表記面2',
+                    type: 'fill',
+                    source: 'bvmap',
+                    'source-layer': 'TpgphArea',
+                    minzoom: 17,
+                    filter: [
+                        'in',
+                        ['get', 'vt_flag17'],
+                        ['literal', [1, 2]]
+                    ],
+                    paint: {
+                        'fill-color': 'rgba(0,0,0,0)',
+                        'fill-outline-color': 'rgba(110,120,130,1)'
+                    }
+                },
+                {
+                    id: '海岸線',
+                    type: 'line',
+                    source: 'bvmap',
+                    'source-layer': 'Cstline',
+                    paint: {
+                        'line-color': 'rgba(110,120,130,1)',
+                        'line-width': 1
+                    }
+                },
+                {
+                    id: '河川_線',
+                    type: 'line',
+                    source: 'bvmap',
+                    'source-layer': 'RvrCL',
+                    paint: {
+                        'line-color': 'rgba(110,120,130,1)',
+                        'line-width': 1
+                    }
+                },
+                {
+                    id: '水涯線',
+                    type: 'line',
+                    source: 'bvmap',
+                    'source-layer': 'WL',
+                    paint: {
+                        'line-color': 'rgba(110,120,130,1)',
+                        'line-width': 1
+                    }
+                },
+                {
+                    id: '水部表記線polygon',
+                    type: 'fill',
+                    source: 'bvmap',
+                    'source-layer': 'WRltLine',
+                    filter: [
+                        '==',
+                        ['geometry-type'],
+                        'Polygon'
+                    ],
+                    paint: {
+                        'fill-color': 'rgba(255,255,255,0)',
+                        'fill-outline-color': 'rgba(110,120,130,1)'
+                    }
+                },
+                {
+                    id: '水部表記線line',
+                    type: 'line',
+                    source: 'bvmap',
+                    'source-layer': 'WRltLine',
+                    filter: [
+                        '==',
+                        ['geometry-type'],
+                        'LineString'
+                    ],
+                    paint: {
+                        'line-color': 'rgba(110,120,130,1)',
+                        'line-width': 1
+                    }
+                },
+                {
+                    id: '行政区画界線',
+                    type: 'line',
+                    source: 'bvmap',
+                    'source-layer': 'AdmBdry',
+                    paint: {
+                        'line-color': 'rgba(110,120,130,1)',
+                        'line-width': 1
+                    }
+                },
+                {
+                    id: '等深線',
+                    type: 'line',
+                    source: 'bvmap',
+                    'source-layer': 'Isbt',
+                    paint: {
+                        'line-color': 'rgba(110,120,130,1)',
+                        'line-width': 1
+                    }
+                },
+                {
+                    id: '水部構造物面',
+                    type: 'fill',
+                    source: 'bvmap',
+                    'source-layer': 'WStrA',
+                    paint: {
+                        'fill-color': 'rgba(0,0,0,0)',
+                        'fill-outline-color': 'rgba(110,120,130,1)'
+                    }
+                },
+                {
+                    id: '水部構造物線',
+                    type: 'line',
+                    source: 'bvmap',
+                    'source-layer': 'WStrL',
+                    maxzoom: 17,
+                    filter: [
+                        'any',
+                        ['!', ['has', 'vt_flag17']],
+                        ['in', ['get', 'vt_flag17'], ['literal', [0, 1]]]
+                    ],
+                    paint: {
+                        'line-color': 'rgba(110,120,130,1)',
+                        'line-width': 1
+                    }
+                },
+                {
+                    id: '水部構造物線2',
+                    type: 'line',
+                    source: 'bvmap',
+                    'source-layer': 'WStrL',
+                    minzoom: 17,
+                    filter: [
+                        'in',
+                        ['get', 'vt_flag17'],
+                        ['literal', [1, 2]]
+                    ],
+                    paint: {
+                        'line-color': 'rgba(110,120,130,1)',
+                        'line-width': 1
+                    }
+                },
+                {
+                    id: '道路_線',
+                    type: 'line',
+                    source: 'bvmap',
+                    'source-layer': 'RdCL',
+                    maxzoom: 17,
+                    paint: {
+                        'line-color': [
+                            'case',
+                            ['==', ['get', 'vt_rnkwidth'], '不明'],
+                            'rgba(255,255,255,0)',
+                            'rgba(110,120,130,1)'
+                        ],
+                        'line-width': 1
+                    }
+                },
+                {
+                    id: '道路_線2',
+                    type: 'line',
+                    source: 'bvmap',
+                    'source-layer': 'RdCL',
+                    minzoom: 17,
+                    filter: [
+                        'all',
+                        ['in', ['get', 'vt_flag17'], ['literal', [1, 2]]]
+                    ],
+                    paint: {
+                        'line-color': 'rgba(110,120,130,1)',
+                        'line-width': 1
+                    }
+                },
+                {
+                    id: '鉄道_線',
+                    maxzoom: 17,
+                    type: 'line',
+                    source: 'bvmap',
+                    'source-layer': 'RailCL',
+                    paint: {
+                        'line-color': 'rgba(110,120,130,1)',
+                        'line-width': 1
+                    }
+                },
+                {
+                    id: '鉄道_線2',
+                    minzoom: 17,
+                    type: 'line',
+                    source: 'bvmap',
+                    'source-layer': 'RailCL',
+                    filter: [
+                        'all',
+                        ['in', ['get', 'vt_flag17'], ['literal', [1, 2]]]
+                    ],
+                    paint: {
+                        'line-color': 'rgba(110,120,130,1)',
+                        'line-width': 1
+                    }
+                },
+                {
+                    id: '建築物_外周線',
+                    type: 'line',
+                    source: 'bvmap',
+                    'source-layer': 'BldA',
+                    paint: {
+                        'line-color': 'rgba(110,120,130,1)',
+                        'line-width': 1
+                    }
+                },
+                {
+                    id: '地下駅',
+                    type: 'fill',
+                    source: 'bvmap',
+                    'source-layer': 'UndergroundStation',
+                    paint: {
+                        'fill-color': 'rgba(0,0,0,0)',
+                        'fill-outline-color': 'rgba(110,120,130,1)'
+                    }
+                },
+                {
+                    id: '道路縁',
+                    minzoom: 17,
+                    type: 'line',
+                    source: 'bvmap',
+                    'source-layer': 'RdEdg',
+                    paint: {
+                        'line-color': 'rgba(110,120,130,1)',
+                        'line-width': 1
+                    }
+                },
+                {
+                    id: '道路構成線',
+                    minzoom: 17,
+                    type: 'line',
+                    source: 'bvmap',
+                    'source-layer': 'RdCompt',
+                    paint: {
+                        'line-color': 'rgba(110,120,130,1)',
+                        'line-width': 1
+                    }
+                },
+                {
+                    id: '軌道_線',
+                    minzoom: 17,
+                    type: 'line',
+                    source: 'bvmap',
+                    'source-layer': 'RailTrCL',
+                    layout: {
+                        'line-sort-key': ['get', 'vt_drworder']
+                    },
+                    paint: {
+                        'line-color': 'rgba(110,120,130,1)',
+                        'line-width': 1
+                    }
+                },
+                {
+                    id: '特定地区界',
+                    type: 'line',
+                    source: 'bvmap',
+                    'source-layer': 'SpcfArea',
+                    paint: {
+                        'line-color': 'rgba(110,120,130,1)',
+                        'line-width': 1
+                    }
+                },
+                {
+                    id: '構造物面',
+                    type: 'fill',
+                    source: 'bvmap',
+                    'source-layer': 'StrctArea',
+                    paint: {
+                        'fill-color': 'rgba(0,0,0,0)',
+                        'fill-outline-color': 'rgba(110,120,130,1)'
+                    }
+                },
+                {
+                    id: '構造物面の外周線',
+                    type: 'line',
+                    source: 'bvmap',
+                    'source-layer': 'StrctArea',
+                    paint: {
+                        'line-color': 'rgba(110,120,130,1)',
+                        'line-width': 1
+                    }
+                },
+                {
+                    id: '構造物線',
+                    type: 'line',
+                    source: 'bvmap',
+                    'source-layer': 'StrctLine',
+                    minzoom: 17,
+                    paint: {
+                        'line-color': 'rgba(110,120,130,1)',
+                        'line-width': 1
+                    }
+                },
+                {
+                    id: '交通トンネル口',
+                    type: 'line',
+                    source: 'bvmap',
+                    'source-layer': 'TrfTnnlEnt',
+                    minzoom: 17,
+                    paint: {
+                        'line-color': 'rgba(110,120,130,1)',
+                        'line-width': 1
+                    }
+                },
+                {
+                    id: '送電線',
+                    type: 'line',
+                    source: 'bvmap',
+                    'source-layer': 'PwrTrnsmL',
+                    paint: {
+                        'line-color': 'rgba(110,120,130,1)',
+                        'line-width': 1
+                    }
+                }
+            ];
+
+            return style;
+        }
+
+        /**
+         * Contour theme style (reproduces contour.html)
+         */
+        function buildContourStyle(style, terrainTileUrl) {
+            // Setup DEM source for contour generation
+            const demSource = new mlcontour.DemSource({
+                url: terrainTileUrl.replace('/{z}/{x}/{y}', '/{z}/{x}/{y}'),
+                encoding: 'terrarium',
+                tileSize: 512,
+                maxzoom: 16,
+                worker: true
+            });
+            demSource.setupMaplibre(maplibregl);
+
+            style.sources.contourSource = {
+                type: 'vector',
+                tiles: [
+                    demSource.contourProtocolUrl({
+                        thresholds: {
+                            11: [50, 500],
+                            12: [20, 200],
+                            13: [10, 100],
+                            14: [5, 50],
+                            15: [2, 20],
+                            16: [1, 10]
+                        },
+                        elevationKey: 'ele',
+                        levelKey: 'level',
+                        contourLayer: 'contours',
+                        buffer: 4,
+                        overzoom: 2
+                    })
+                ],
+                maxzoom: 17
+            };
+
+            style.layers = [
+                {
+                    id: 'background',
+                    type: 'background',
+                    paint: {
+                        'background-color': '#e0e0e0'
+                    }
+                },
+                {
+                    id: 'hillshade',
+                    type: 'hillshade',
+                    source: 'terrainSource',
+                    paint: {
+                        'hillshade-exaggeration': 0.2,
+                        'hillshade-highlight-color': 'rgb(255,255,235)',
+                        'hillshade-shadow-color': 'rgb(110,120,130)'
+                    }
+                },
+                {
+                    id: 'contours',
+                    type: 'line',
+                    source: 'contourSource',
+                    'source-layer': 'contours',
+                    paint: {
+                        'line-color': 'rgb(215,151,60)',
+                        'line-width': [
+                            'interpolate', ['linear'], ['zoom'],
+                            11, ['match', ['get', 'level'], 1, 0.8, 0.4],
+                            14, ['match', ['get', 'level'], 1, 1.2, 0.6],
+                            16, ['match', ['get', 'level'], 1, 1.5, 0.7]
+                        ],
+                        'line-opacity': 0.95
+                    },
+                    layout: {
+                        'line-cap': 'round',
+                        'line-join': 'round'
+                    }
+                }
+            ];
+
+            return style;
+        }
+
+        /**
+         * Parse map hash (z/lat/lng/pitch/bearing) from URL
+         */
+        function parseMapHash(mapParam) {
+            if (!mapParam) return null;
+            
+            const parts = mapParam.split('/');
+            if (parts.length < 3) return null;
+
+            const result = {
+                zoom: parseFloat(parts[0]),
+                center: [parseFloat(parts[2]), parseFloat(parts[1])]
+            };
+
+            if (parts.length >= 4) {
+                result.pitch = parseFloat(parts[3]);
+            }
+            if (parts.length >= 5) {
+                result.bearing = parseFloat(parts[4]);
+            }
+
+            return result;
+        }
+
+        /**
+         * Format map position to hash string
+         */
+        function formatMapHash(zoom, center, pitch, bearing) {
+            const z = zoom.toFixed(2);
+            const lat = center.lat.toFixed(5);
+            const lng = center.lng.toFixed(5);
+            const p = pitch.toFixed(1);
+            const b = bearing.toFixed(0);
+            return `${z}/${lat}/${lng}/${p}/${b}`;
+        }
+
+        // Initialize map
+        async function initMap() {
+            const style = await buildStyle(terrainTileJsonUrl, theme);
+
+            // Parse initial map position from hash
+            const mapPosition = parseMapHash(hashParams.map);
+
+            const mapOptions = {
+                container: 'map',
+                style: style,
+                maxPitch: 85
+            };
+
+            // Set initial position from hash or default
+            if (mapPosition) {
+                mapOptions.zoom = mapPosition.zoom;
+                mapOptions.center = mapPosition.center;
+                if (mapPosition.pitch !== undefined) {
+                    mapOptions.pitch = mapPosition.pitch;
+                }
+                if (mapPosition.bearing !== undefined) {
+                    mapOptions.bearing = mapPosition.bearing;
+                }
+            } else {
+                // Default position (same as original fusite)
+                mapOptions.zoom = 14.74;
+                mapOptions.center = [129.87255, 32.75055];
+                mapOptions.pitch = 16.2;
+                mapOptions.bearing = 6;
+            }
+
+            const map = new maplibregl.Map(mapOptions);
+
+            // Add navigation controls
+            map.addControl(new maplibregl.NavigationControl({
+                visualizePitch: true,
+                showZoom: true,
+                showCompass: true
+            }), 'top-right');
+
+            // Add scale control
+            map.addControl(new maplibregl.ScaleControl({
+                maxWidth: 200,
+                unit: 'metric'
+            }), 'bottom-right');
+
+            // Add fullscreen control
+            map.addControl(new maplibregl.FullscreenControl(), 'top-right');
+
+            // Add geolocate control
+            map.addControl(new maplibregl.GeolocateControl({
+                positionOptions: {
+                    enableHighAccuracy: true
+                },
+                trackUserLocation: true
+            }), 'top-right');
+
+            // Update hash when map moves (using 'map' key as specified)
+            map.on('moveend', () => {
+                const center = map.getCenter();
+                const zoom = map.getZoom();
+                const pitch = map.getPitch();
+                const bearing = map.getBearing();
+                
+                updateHashParams({
+                    map: formatMapHash(zoom, center, pitch, bearing),
+                    terrain: terrain,
+                    theme: theme
+                });
+            });
+
+            // Add GSI attribution on load
+            map.on('load', () => {
+                console.log(`Map loaded with theme: ${theme}, terrain: ${terrain}`);
+
+                const attributionControl = document.querySelector('.maplibregl-ctrl-attrib-inner');
+                if (attributionControl && !attributionControl.innerHTML.includes('国土地理院')) {
+                    attributionControl.innerHTML += ' | データ: <a href="https://www.gsi.go.jp/" target="_blank" rel="noopener noreferrer">国土地理院 (GSI Japan)</a> R 6JHs 133';
+                }
+
+                // Update info panel description based on theme
+                const infoDesc = document.getElementById('info-description');
+                if (theme === 'contour') {
+                    infoDesc.textContent = 'Terrarium 標高タイルから動的に等高線を生成';
+                } else if (theme === 'gsi') {
+                    infoDesc.textContent = '国土地理院の標高データと基盤地図を表示';
+                } else {
+                    infoDesc.textContent = '国土地理院の標高データを Terrarium 形式で可視化';
+                }
+
+                // Set initial hash if not already set
+                if (!hashParams.map) {
+                    const center = map.getCenter();
+                    const zoom = map.getZoom();
+                    const pitch = map.getPitch();
+                    const bearing = map.getBearing();
+                    
+                    updateHashParams({
+                        map: formatMapHash(zoom, center, pitch, bearing),
+                        terrain: terrain,
+                        theme: theme
+                    });
+                }
+            });
+
+            map.on('error', (e) => {
+                console.error('Map error:', e);
+            });
+        }
+
+        // Info panel toggle
+        const toggleBtn = document.getElementById('info-toggle');
+        const infoPanel = document.getElementById('info-panel');
+        const updateToggleUi = () => {
+            const isOpen = !infoPanel.classList.contains('hidden');
+            toggleBtn.setAttribute('aria-expanded', String(isOpen));
+            infoPanel.setAttribute('aria-hidden', String(!isOpen));
+            toggleBtn.textContent = isOpen ? '×' : 'ℹ️';
+            toggleBtn.title = isOpen ? '情報を閉じる' : '情報を開く';
+        };
+        toggleBtn.addEventListener('click', () => {
+            infoPanel.classList.toggle('hidden');
+            updateToggleUi();
+        });
+        updateToggleUi();
+
+        // Initialize the map
+        initMap();
+    </script>
+</body>
+
+</html>
