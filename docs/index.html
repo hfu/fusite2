@@ -572,7 +572,7 @@
         function buildContourStyle(style, terrainTileUrl) {
             // Setup DEM source for contour generation
             const demSource = new mlcontour.DemSource({
-                url: terrainTileUrl.replace('/{z}/{x}/{y}', '/{z}/{x}/{y}'),
+                url: terrainTileUrl,
                 encoding: 'terrarium',
                 tileSize: 512,
                 maxzoom: 16,
