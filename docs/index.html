@@ -837,18 +837,25 @@
             // Add Terrain Exaggeration control
             map.addControl(new TerrainExaggerationControl(exag), 'bottom-left');
 
+            // Helper function to get current exaggeration from slider
+            function getCurrentExaggeration() {
+                const slider = document.getElementById('terrain-slider');
+                return slider ? parseFloat(slider.value) : exag;
+            }
+
             // Update hash when map moves (using 'map' key as specified)
             map.on('moveend', () => {
                 const center = map.getCenter();
                 const zoom = map.getZoom();
                 const pitch = map.getPitch();
                 const bearing = map.getBearing();
+                const currentExag = getCurrentExaggeration();
                 
                 updateHashParams({
                     map: formatMapHash(zoom, center, pitch, bearing),
                     terrain: terrain,
                     theme: theme,
-                    exag: exag.toFixed(1)
+                    exag: currentExag.toFixed(1)
                 });
             });
 
@@ -877,12 +884,13 @@
                     const zoom = map.getZoom();
                     const pitch = map.getPitch();
                     const bearing = map.getBearing();
+                    const currentExag = getCurrentExaggeration();
                     
                     updateHashParams({
                         map: formatMapHash(zoom, center, pitch, bearing),
                         terrain: terrain,
                         theme: theme,
-                        exag: exag.toFixed(1)
+                        exag: currentExag.toFixed(1)
                     });
                 }
             });
@@ -920,15 +928,16 @@
          * Uses standard web APIs for broad browser compatibility
          */
         function updateAndReload(newTheme, newTerrain) {
+            // Build hash string using same logic as updateHashParams
             const currentParams = parseHashParams();
-            const newParams = {
+            const mergedParams = {
                 ...currentParams,
                 theme: newTheme,
                 terrain: newTerrain
             };
 
             const hashParts = [];
-            for (const [key, value] of Object.entries(newParams)) {
+            for (const [key, value] of Object.entries(mergedParams)) {
                 if (value !== undefined && value !== null) {
                     hashParts.push(`${key}=${value}`);
                 }
@@ -938,8 +947,8 @@
             const newUrl = window.location.pathname + '#' + newHash;
             
             // Use standard location.href assignment for cross-browser compatibility
+            // Setting href to a new URL with different hash triggers navigation
             window.location.href = newUrl;
-            window.location.reload();
         }
 
         // Event handlers for dropdown changes
