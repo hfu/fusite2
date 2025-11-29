@@ -25,6 +25,25 @@
     <div id="info-panel" class="info-panel hidden" aria-hidden="true">
         <h1>fusite2 標高タイル</h1>
         <p id="info-description">国土地理院の標高データを Terrarium 形式で可視化</p>
+        
+        <div class="control-group">
+            <label for="theme-select">テーマ:</label>
+            <select id="theme-select">
+                <option value="osm">OSM</option>
+                <option value="gsi">GSI</option>
+                <option value="contour">等高線</option>
+            </select>
+        </div>
+        
+        <div class="control-group">
+            <label for="terrain-select">地形:</label>
+            <select id="terrain-select">
+                <option value="fusi">fusi</option>
+                <option value="iwaki">iwaki</option>
+                <option value="shimabara">shimabara</option>
+            </select>
+        </div>
+        
         <p class="attribution">
             データ: <a href="https://www.gsi.go.jp/" target="_blank" rel="noopener noreferrer">国土地理院 (GSI Japan)</a><br>
             測量法に基づく国土地理院長承認（使用）R 6JHs 133<br>
@@ -81,6 +100,7 @@
         const hashParams = parseHashParams();
         const terrain = hashParams.terrain || 'fusi';
         const theme = hashParams.theme || 'osm';
+        const exag = parseFloat(hashParams.exag) || 1;
 
         // TileJSON URL for terrain
         const terrainTileJsonUrl = `https://tunnel.optgeo.org/martin/${terrain}`;
@@ -88,7 +108,7 @@
         /**
          * Build the style object based on theme and terrain
          */
-        async function buildStyle(terrainTileJsonUrl, theme) {
+        async function buildStyle(terrainTileJsonUrl, theme, exaggeration) {
             // Fetch TileJSON to get tile URL
             let terrainTiles;
             try {
@@ -119,7 +139,8 @@
                 },
                 layers: [],
                 terrain: {
-                    source: 'terrainSource'
+                    source: 'terrainSource',
+                    exaggeration: exaggeration
                 }
             };
 
@@ -174,8 +195,6 @@
                     }
                 }
             ];
-
-            style.terrain.exaggeration = 1.5;
 
             style.sky = {
                 'sky-color': '#87CEEB',
@@ -683,7 +702,7 @@
 
         // Initialize map
         async function initMap() {
-            const style = await buildStyle(terrainTileJsonUrl, theme);
+            const style = await buildStyle(terrainTileJsonUrl, theme, exag);
 
             // Parse initial map position from hash
             const mapPosition = parseMapHash(hashParams.map);
@@ -691,7 +710,8 @@
             const mapOptions = {
                 container: 'map',
                 style: style,
-                maxPitch: 85
+                maxPitch: 85,
+                projection: 'globe'
             };
 
             // Set initial position from hash or default
@@ -738,23 +758,110 @@
                 trackUserLocation: true
             }), 'top-right');
 
+            // Custom Globe Control
+            class GlobeControl {
+                constructor() {
+                    this._isGlobeView = true;
+                }
+
+                onAdd(map) {
+                    this._map = map;
+                    this._container = document.createElement('div');
+                    this._container.className = 'maplibregl-ctrl maplibregl-ctrl-group';
+                    this._button = document.createElement('button');
+                    this._button.className = 'maplibregl-ctrl-icon';
+                    this._button.type = 'button';
+                    this._button.title = 'Globe/Mercator 切替';
+                    this._button.innerHTML = '🌐';
+                    this._button.style.fontSize = '18px';
+                    this._button.onclick = () => {
+                        this._isGlobeView = !this._isGlobeView;
+                        map.setProjection(this._isGlobeView ? 'globe' : 'mercator');
+                        this._button.innerHTML = this._isGlobeView ? '🌐' : '🗺️';
+                    };
+                    this._container.appendChild(this._button);
+                    return this._container;
+                }
+
+                onRemove() {
+                    this._container.parentNode.removeChild(this._container);
+                    this._map = undefined;
+                }
+            }
+
+            // Add Globe control
+            map.addControl(new GlobeControl(), 'top-right');
+
+            // Custom Terrain Exaggeration Control
+            class TerrainExaggerationControl {
+                constructor(initialValue) {
+                    this._initialValue = initialValue;
+                }
+
+                onAdd(map) {
+                    this._map = map;
+                    this._container = document.createElement('div');
+                    this._container.className = 'maplibregl-ctrl terrain-ctrl';
+                    this._container.innerHTML = `
+                        <div class="terrain-exaggeration">
+                            <label for="terrain-slider">地形強調: <span id="terrain-value">${this._initialValue.toFixed(1)}</span>x</label>
+                            <input type="range" id="terrain-slider" min="0" max="3" step="0.1" value="${this._initialValue}">
+                        </div>
+                    `;
+
+                    const slider = this._container.querySelector('#terrain-slider');
+                    const valueDisplay = this._container.querySelector('#terrain-value');
+
+                    slider.oninput = (e) => {
+                        const value = parseFloat(e.target.value);
+                        valueDisplay.textContent = value.toFixed(1);
+                        map.setTerrain({
+                            source: 'terrainSource',
+                            exaggeration: value
+                        });
+                        // Update URL with new exaggeration value
+                        updateHashParams({
+                            exag: value.toFixed(1)
+                        });
+                    };
+
+                    return this._container;
+                }
+
+                onRemove() {
+                    this._container.parentNode.removeChild(this._container);
+                    this._map = undefined;
+                }
+            }
+
+            // Add Terrain Exaggeration control
+            map.addControl(new TerrainExaggerationControl(exag), 'bottom-left');
+
+            // Helper function to get current exaggeration from slider
+            function getCurrentExaggeration() {
+                const slider = document.getElementById('terrain-slider');
+                return slider ? parseFloat(slider.value) : exag;
+            }
+
             // Update hash when map moves (using 'map' key as specified)
             map.on('moveend', () => {
                 const center = map.getCenter();
                 const zoom = map.getZoom();
                 const pitch = map.getPitch();
                 const bearing = map.getBearing();
+                const currentExag = getCurrentExaggeration();
                 
                 updateHashParams({
                     map: formatMapHash(zoom, center, pitch, bearing),
                     terrain: terrain,
-                    theme: theme
+                    theme: theme,
+                    exag: currentExag.toFixed(1)
                 });
             });
 
             // Add GSI attribution on load
             map.on('load', () => {
-                console.log(`Map loaded with theme: ${theme}, terrain: ${terrain}`);
+                console.log(`Map loaded with theme: ${theme}, terrain: ${terrain}, exag: ${exag}`);
 
                 const attributionControl = document.querySelector('.maplibregl-ctrl-attrib-inner');
                 if (attributionControl && !attributionControl.innerHTML.includes('国土地理院')) {
@@ -777,11 +884,13 @@
                     const zoom = map.getZoom();
                     const pitch = map.getPitch();
                     const bearing = map.getBearing();
+                    const currentExag = getCurrentExaggeration();
                     
                     updateHashParams({
                         map: formatMapHash(zoom, center, pitch, bearing),
                         terrain: terrain,
-                        theme: theme
+                        theme: theme,
+                        exag: currentExag.toFixed(1)
                     });
                 }
             });
@@ -806,6 +915,50 @@
             updateToggleUi();
         });
         updateToggleUi();
+
+        // Initialize dropdowns with current values
+        const themeSelect = document.getElementById('theme-select');
+        const terrainSelect = document.getElementById('terrain-select');
+        
+        themeSelect.value = theme;
+        terrainSelect.value = terrain;
+
+        /**
+         * Update URL and reload page when theme or terrain changes
+         * Uses standard web APIs for broad browser compatibility
+         */
+        function updateAndReload(newTheme, newTerrain) {
+            // Build hash string using same logic as updateHashParams
+            const currentParams = parseHashParams();
+            const mergedParams = {
+                ...currentParams,
+                theme: newTheme,
+                terrain: newTerrain
+            };
+
+            const hashParts = [];
+            for (const [key, value] of Object.entries(mergedParams)) {
+                if (value !== undefined && value !== null) {
+                    hashParts.push(`${key}=${value}`);
+                }
+            }
+
+            const newHash = hashParts.join('&');
+            const newUrl = window.location.pathname + '#' + newHash;
+            
+            // Use standard location.href assignment for cross-browser compatibility
+            // Setting href to a new URL with different hash triggers navigation
+            window.location.href = newUrl;
+        }
+
+        // Event handlers for dropdown changes
+        themeSelect.addEventListener('change', (e) => {
+            updateAndReload(e.target.value, terrain);
+        });
+
+        terrainSelect.addEventListener('change', (e) => {
+            updateAndReload(theme, e.target.value);
+        });
 
         // Initialize the map
         initMap();

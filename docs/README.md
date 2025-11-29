@@ -4,7 +4,7 @@
 
 ## URL フラグメントパラメータ
 
-`#map=xxx&terrain=yyy&theme=zzz` 形式のフラグメントを使用して地図の状態を制御します。
+`#map=xxx&terrain=yyy&theme=zzz&exag=www` 形式のフラグメントを使用して地図の状態を制御します。
 
 ### パラメータ
 
@@ -13,17 +13,18 @@
 | `map` | MapLibre GL JS の map hash 形式 (`zoom/lat/lng/pitch/bearing`) | `14.74/32.75055/129.87255/16.2/6` | `14/35.6812/139.7671/45/0` |
 | `terrain` | Terrarium タイルの場所を指定 (TileJSON を `https://tunnel.optgeo.org/martin/{terrain}` から取得) | `fusi` | `fusi`, `iwaki`, `shimabara` |
 | `theme` | 地形の上に載せる地図スタイル | `osm` | `osm`, `gsi`, `contour` |
+| `exag` | 地形強調度（0〜3の範囲で指定可能） | `1` | `1.5`, `2.0` |
 
 ### テーマ
 
-- **`osm`** (デフォルト): OpenStreetMap ラスタータイルを背景に表示。地形を1.5倍誇張。
+- **`osm`** (デフォルト): OpenStreetMap ラスタータイルを背景に表示。
 - **`gsi`**: 国土地理院の基盤地図情報（bvmap）ベクトルタイルを使用。行政区画、道路、鉄道、建物など詳細な地理情報を表示。
 - **`contour`**: Terrarium 標高タイルから `maplibre-contour` を使用して動的に等高線を生成。
 
 ### 使用例
 
 ```
-# デフォルト（島原周辺、OSMテーマ、fusi地形）
+# デフォルト（島原周辺、OSMテーマ、fusi地形、強調度1）
 https://hfu.github.io/fusite2/
 
 # 東京周辺をGSIテーマで表示
@@ -32,9 +33,23 @@ https://hfu.github.io/fusite2/#map=14/35.6812/139.7671/45/0&terrain=fusi&theme=g
 # いわき周辺を等高線テーマで表示
 https://hfu.github.io/fusite2/#map=13/37.0/140.9/30/0&terrain=iwaki&theme=contour
 
-# 島原を異なる地形データで表示
-https://hfu.github.io/fusite2/#map=14/32.75/129.87/20/0&terrain=shimabara&theme=osm
+# 島原を異なる地形データで表示（強調度2倍）
+https://hfu.github.io/fusite2/#map=14/32.75/129.87/20/0&terrain=shimabara&theme=osm&exag=2.0
 ```
+
+## コントロール
+
+### 右上のコントロール
+- **NavigationControl**: ズーム、回転、ピッチ調整
+- **FullscreenControl**: フルスクリーン表示
+- **GeolocateControl**: 現在地表示
+- **GlobeControl**: Globe/Mercator 投影法の切替
+
+### 左下のコントロール
+- **TerrainExaggerationControl**: 地形強調度のスライダー（0〜3倍）
+
+### 左上のパネル
+- **情報パネル**: テーマ・地形の切り替えドロップダウン、サイト情報
 
 ## データソース
 

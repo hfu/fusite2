@@ -82,6 +82,36 @@ body {
     text-decoration: underline;
 }
 
+/* Dropdown control group */
+.control-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 10px 0;
+}
+
+.control-group label {
+    font-size: 13px;
+    color: #333;
+    min-width: 50px;
+}
+
+.control-group select {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: #fff;
+    font-size: 13px;
+    color: #333;
+    cursor: pointer;
+}
+
+.control-group select:focus {
+    outline: 2px solid #66a3ff;
+    border-color: #66a3ff;
+}
+
 /* Terrain slider control */
 .terrain-ctrl {
     background: rgba(255, 255, 255, 0.95);
@@ -124,6 +154,16 @@ body {
     
     .info-panel p {
         font-size: 12px;
+    }
+
+    .control-group {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+
+    .control-group select {
+        width: 100%;
     }
 }
 
