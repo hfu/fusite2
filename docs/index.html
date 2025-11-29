@@ -143,13 +143,25 @@
                 glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
                 sources: {
                     terrainSource: {
-                        type: 'raster-dem',
-                        tiles: terrainTiles,
-                        encoding: 'terrarium',
-                        tileSize: 512,
-                        minzoom: 0,
-                        maxzoom: 16
-                    }
+                            type: 'raster-dem',
+                            tiles: terrainTiles,
+                            encoding: 'terrarium',
+                            tileSize: 512,
+                            minzoom: 0,
+                            maxzoom: 16
+                        },
+                    // Separate source for hillshade layers to avoid using the same
+                    // source object for both 3D terrain and hillshade rendering.
+                    // Using two sources (even pointing to the same tiles) improves
+                    // rendering quality and avoids MapLibre warnings.
+                    hillshadeSource: {
+                            type: 'raster-dem',
+                            tiles: terrainTiles,
+                            encoding: 'terrarium',
+                            tileSize: 512,
+                            minzoom: 0,
+                            maxzoom: 16
+                        }
                 },
                 layers: [],
                 terrain: {
@@ -223,7 +235,7 @@
                     {
                         id: 'hillshade',
                         type: 'hillshade',
-                        source: 'terrainSource',
+                        source: 'hillshadeSource',
                         paint: {
                             'hillshade-exaggeration': 0.3,
                             'hillshade-shadow-color': '#473B24'
@@ -278,7 +290,7 @@
                 {
                     id: 'hillshade',
                     type: 'hillshade',
-                    source: 'terrainSource',
+                    source: 'hillshadeSource',
                     paint: {
                         'hillshade-exaggeration': 0.3,
                         'hillshade-shadow-color': '#473B24'
@@ -318,7 +330,7 @@
                 {
                     id: 'hillshade',
                     type: 'hillshade',
-                    source: 'terrainSource',
+                    source: 'hillshadeSource',
                     paint: {
                         'hillshade-exaggeration': 0.2,
                         'hillshade-highlight-color': 'rgb(255,255,235)',
@@ -722,7 +734,7 @@
                 {
                     id: 'hillshade',
                     type: 'hillshade',
-                    source: 'terrainSource',
+                    source: 'hillshadeSource',
                     paint: {
                         'hillshade-exaggeration': 0.2,
                         'hillshade-highlight-color': 'rgb(255,255,235)',
