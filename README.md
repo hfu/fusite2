@@ -10,6 +10,7 @@ fusite2 は `#map=xxx&terrain=yyy&theme=zzz` 形式の URL フラグメントを
   - `osm` (デフォルト): OpenStreetMap ベース
   - `gsi`: 国土地理院基盤地図情報ベース
   - `contour`: 動的等高線生成
+  - `lineage`: 地形に対応した画像タイル（`terrain` に `-lineage` を付加したタイルを使用）
 - **terrain**: Terrarium タイルの場所を指定 (デフォルト: `fusi`、他に `iwaki`, `shimabara` など)
 - **map**: MapLibre GL JS の hash 形式による地図位置
 

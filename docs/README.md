@@ -14,8 +14,10 @@
 |-----------|------|-------------|-----|
 | `map` | MapLibre GL JS の map hash 形式 (`zoom/lat/lng/pitch/bearing`) | `14.74/32.75055/129.87255/16.2/6` | `14/35.6812/139.7671/45/0` |
 | `terrain` | Terrarium タイルの場所を指定 (TileJSON を `https://tunnel.optgeo.org/martin/{terrain}` から取得) | `fusi` | `fusi`, `iwaki`, `shimabara` |
-| `theme` | 地形の上に載せる地図スタイル | `osm` | `osm`, `gsi`, `contour` |
+| `theme` | 地形の上に載せる地図スタイル | `osm` | `osm`, `gsi`, `contour`, `lineage` |
 | `exag` | 地形強調度（0〜3の範囲で指定可能） | `1` | `1.5`, `2.0` |
+
+注: `lineage` テーマを使うときは、対応する画像タイルを示す TileJSON を `https://tunnel.optgeo.org/martin/{terrain}-lineage` から取得します（例: `terrain=iwaki` と `theme=lineage` の組合せでは `https://tunnel.optgeo.org/martin/iwaki-lineage` を参照します）。
 
 ### テーマ
 

@@ -23,7 +23,7 @@
     <button id="info-toggle" class="info-toggle" aria-expanded="false" aria-controls="info-panel" title="情報を開く">ℹ️</button>
 
     <div id="info-panel" class="info-panel hidden" aria-hidden="true">
-        <h1>fusite2 標高タイル</h1>
+        <h1>fusite2</h1>
         <p id="info-description">国土地理院の標高データを Terrarium 形式で可視化</p>
         
         <div class="control-group">
@@ -32,6 +32,7 @@
                 <option value="osm">OSM</option>
                 <option value="gsi">GSI</option>
                 <option value="contour">等高線</option>
+                <option value="lineage">元データ</option>
             </select>
         </div>
         
@@ -119,7 +120,10 @@
          * Build the style object based on theme and terrain
          */
         async function buildStyle(terrainTileJsonUrl, theme, exaggeration) {
-            // Fetch TileJSON to get tile URL
+            // Fetch TileJSON for terrain (DEM source). Always use the
+            // original terrain TileJSON (e.g. /martin/iwaki) to build the
+            // raster-dem source. For the `lineage` theme we'll separately
+            // fetch the `{terrain}-lineage` TileJSON for imagery tiles.
             let terrainTiles;
             try {
                 const response = await fetch(terrainTileJsonUrl);
@@ -129,7 +133,7 @@
                 const tileJson = await response.json();
                 terrainTiles = tileJson.tiles;
             } catch (error) {
-                console.error('Error fetching TileJSON:', error);
+                console.error('Error fetching TileJSON for terrain:', error);
                 // Fallback to default tile URL pattern
                 terrainTiles = [`${terrainTileJsonUrl}/{z}/{x}/{y}`];
             }
@@ -161,6 +165,82 @@
                 return buildGsiStyle(style);
             } else if (theme === 'contour') {
                 return buildContourStyle(style, terrainTiles[0]);
+            } else if (theme === 'lineage') {
+                // Attempt to fetch the TileJSON that explicitly lists lineage
+                // imagery tiles (e.g. /martin/iwaki-lineage). If that fails,
+                // fall back to a heuristic transformation of the terrain
+                // tile URLs by inserting `-lineage` into the path.
+                const lineageTileJsonUrl = terrainTileJsonUrl + '-lineage';
+                let lineageTiles;
+                try {
+                    const resp = await fetch(lineageTileJsonUrl);
+                    if (!resp.ok) throw new Error(`Failed to fetch lineage TileJSON: ${resp.status}`);
+                    const tj = await resp.json();
+                    lineageTiles = tj.tiles;
+                } catch (e) {
+                    console.warn('Failed to fetch lineage TileJSON, falling back to heuristic tile URLs:', e);
+                    // Derive terrain name from the provided TileJSON URL
+                    const m = terrainTileJsonUrl.match(/\/([^\/\?#]+)\/?$/);
+                    const terrainName = m ? m[1] : null;
+                    lineageTiles = terrainTiles.map(t => {
+                        if (terrainName) {
+                            try {
+                                const esc = terrainName.replace(/[.*+?^${}()|[\\]\\]/g, '\\\\$&');
+                                const re = new RegExp('/' + esc + '(?=/|$)');
+                                return t.replace(re, '/' + terrainName + '-lineage');
+                            } catch (err) {
+                                return t + '';
+                            }
+                        }
+                        return t + '-lineage';
+                    });
+                }
+
+                // Add raster source for lineage imagery
+                style.sources.lineage = {
+                    type: 'raster',
+                    tiles: lineageTiles,
+                    tileSize: 256,
+                    maxzoom: 19
+                };
+
+                style.layers = [
+                    {
+                        id: 'background',
+                        type: 'background',
+                        paint: {
+                            'background-color': '#e0e0e0'
+                        }
+                    },
+                    {
+                        id: 'lineage',
+                        type: 'raster',
+                        source: 'lineage',
+                        paint: {
+                            'raster-opacity': 1.0
+                        }
+                    },
+                    {
+                        id: 'hillshade',
+                        type: 'hillshade',
+                        source: 'terrainSource',
+                        paint: {
+                            'hillshade-exaggeration': 0.3,
+                            'hillshade-shadow-color': '#473B24'
+                        }
+                    }
+                ];
+
+                style.sky = {
+                    'sky-color': '#87CEEB',
+                    'sky-horizon-blend': 0.5,
+                    'horizon-color': '#ffffff',
+                    'horizon-fog-blend': 0.5,
+                    'fog-color': '#ffffff',
+                    'fog-ground-blend': 0.5
+                };
+
+                return style;
             }
 
             // Default to osm
@@ -884,6 +964,8 @@
                     infoDesc.textContent = 'Terrarium 標高タイルから動的に等高線を生成';
                 } else if (theme === 'gsi') {
                     infoDesc.textContent = '国土地理院の標高データと基盤地図を表示';
+                } else if (theme === 'lineage') {
+                    infoDesc.textContent = '地形に対応した Lineage 画像タイルを表示（terrain に "-lineage" を付加したタイル）';
                 } else {
                     infoDesc.textContent = '国土地理院の標高データを Terrarium 形式で可視化';
                 }
@@ -997,6 +1079,8 @@
                     infoDesc.textContent = 'Terrarium 標高タイルから動的に等高線を生成';
                 } else if (theme === 'gsi') {
                     infoDesc.textContent = '国土地理院の標高データと基盤地図を表示';
+                } else if (theme === 'lineage') {
+                    infoDesc.textContent = '地形に対応した Lineage 画像タイルを表示（terrain に "-lineage" を付加したタイル）';
                 } else {
                     infoDesc.textContent = '国土地理院の標高データを Terrarium 形式で可視化';
                 }
