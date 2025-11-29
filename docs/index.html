@@ -189,6 +189,10 @@
                     if (!resp.ok) throw new Error(`Failed to fetch lineage TileJSON: ${resp.status}`);
                     const tj = await resp.json();
                     lineageTiles = tj.tiles;
+                    // If TileJSON provides metadata, propagate it to the source
+                    var lineageTileSize = tj.tileSize || tj.tilesize || tj.tilesize || 256;
+                    var lineageMaxzoom = tj.maxzoom || tj.maxZoom || tj.maxZoom || 19;
+                    var lineageAttribution = tj.attribution || tj.attribution || '';
                 } catch (e) {
                     console.warn('Failed to fetch lineage TileJSON, falling back to heuristic tile URLs:', e);
                     // Derive terrain name from the provided TileJSON URL
@@ -208,12 +212,15 @@
                     });
                 }
 
-                // Add raster source for lineage imagery
+                // Add raster source for lineage imagery. If we were able to
+                // fetch the TileJSON, prefer its `tiles`, `tileSize` and
+                // `maxzoom` values; otherwise fall back to sensible defaults.
                 style.sources.lineage = {
                     type: 'raster',
                     tiles: lineageTiles,
-                    tileSize: 256,
-                    maxzoom: 19
+                    tileSize: typeof lineageTileSize !== 'undefined' ? lineageTileSize : 256,
+                    maxzoom: typeof lineageMaxzoom !== 'undefined' ? lineageMaxzoom : 19,
+                    attribution: typeof lineageAttribution !== 'undefined' ? lineageAttribution : undefined
                 };
 
                 style.layers = [
