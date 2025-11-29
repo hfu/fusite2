@@ -77,7 +77,12 @@
         }
 
         /**
-         * Update URL fragment without triggering hashchange
+         * Update URL fragment without triggering hashchange.
+         *
+         * This uses `history.replaceState` to update only the fragment/hash
+         * without causing a navigation. Use this when you want the URL to
+         * reflect UI state but do not want to add a new history entry or
+         * trigger a `hashchange` navigation.
          */
         function updateHashParams(newParams) {
             const currentParams = parseHashParams();
@@ -97,13 +102,18 @@
         }
 
         // Parse initial parameters
-        const hashParams = parseHashParams();
-        const terrain = hashParams.terrain || 'fusi';
-        const theme = hashParams.theme || 'osm';
-        const exag = parseFloat(hashParams.exag) || 1;
+        let hashParams = parseHashParams();
+        let terrain = hashParams.terrain || 'fusi';
+        let theme = hashParams.theme || 'osm';
+        let exag = parseFloat(hashParams.exag) || 1;
 
-        // TileJSON URL for terrain
-        const terrainTileJsonUrl = `https://tunnel.optgeo.org/martin/${terrain}`;
+        // Helper to construct TileJSON URL for a given terrain
+        function getTerrainTileJsonUrl(terrainName) {
+            return `https://tunnel.optgeo.org/martin/${terrainName}`;
+        }
+
+        // Global map reference so other functions can update the map dynamically
+        let map = null;
 
         /**
          * Build the style object based on theme and terrain
@@ -702,7 +712,7 @@
 
         // Initialize map
         async function initMap() {
-            const style = await buildStyle(terrainTileJsonUrl, theme, exag);
+            const style = await buildStyle(getTerrainTileJsonUrl(terrain), theme, exag);
 
             // Parse initial map position from hash
             const mapPosition = parseMapHash(hashParams.map);
@@ -732,7 +742,7 @@
                 mapOptions.bearing = 6;
             }
 
-            const map = new maplibregl.Map(mapOptions);
+            map = new maplibregl.Map(mapOptions);
 
             // Add navigation controls
             map.addControl(new maplibregl.NavigationControl({
@@ -924,11 +934,13 @@
         terrainSelect.value = terrain;
 
         /**
-         * Update URL and reload page when theme or terrain changes
-         * Uses standard web APIs for broad browser compatibility
+         * Update URL fragment and apply changes without full reload.
+         * This updates the hash (via history.replaceState) and then
+         * rebuilds/applies the map style so theme/terrain changes take effect
+         * immediately.
          */
-        function updateAndReload(newTheme, newTerrain) {
-            // Build hash string using same logic as updateHashParams
+        async function updateAndApply(newTheme, newTerrain) {
+            // Build merged params and new hash
             const currentParams = parseHashParams();
             const mergedParams = {
                 ...currentParams,
@@ -944,20 +956,65 @@
             }
 
             const newHash = hashParts.join('&');
-            const newUrl = window.location.pathname + '#' + newHash;
-            
-            // Use standard location.href assignment for cross-browser compatibility
-            // Setting href to a new URL with different hash triggers navigation
-            window.location.href = newUrl;
+            // Update the URL fragment without creating a history entry
+            history.replaceState(null, '', '#' + newHash);
+
+            // Re-parse and apply to map
+            await applyHashParamsToMap();
         }
 
-        // Event handlers for dropdown changes
+        /**
+         * Read the current hash params and apply the theme/terrain/exag to the map
+         * without performing a full page reload. This will rebuild the style and
+         * call `map.setStyle` so MapLibre updates visuals accordingly.
+         */
+        async function applyHashParamsToMap() {
+            if (!map) return;
+
+            hashParams = parseHashParams();
+            terrain = hashParams.terrain || terrain;
+            theme = hashParams.theme || theme;
+            exag = parseFloat(hashParams.exag) || exag;
+
+            // Update dropdown UI to reflect current params
+            if (typeof themeSelect !== 'undefined' && themeSelect) themeSelect.value = theme;
+            if (typeof terrainSelect !== 'undefined' && terrainSelect) terrainSelect.value = terrain;
+
+            // Build and apply new style.
+            // Note: `map.setStyle` replaces the current style (sources and
+            // layers). UI controls added via `map.addControl` are usually
+            // retained by MapLibre, but style-specific resources (sources,
+            // layers) are reconstructed. This approach avoids a full page
+            // reload while ensuring the visual style updates to the new
+            // `theme`/`terrain` settings.
+            const style = await buildStyle(getTerrainTileJsonUrl(terrain), theme, exag);
+            map.setStyle(style);
+
+            // Update info description to reflect new theme immediately
+            const infoDesc = document.getElementById('info-description');
+            if (infoDesc) {
+                if (theme === 'contour') {
+                    infoDesc.textContent = 'Terrarium 標高タイルから動的に等高線を生成';
+                } else if (theme === 'gsi') {
+                    infoDesc.textContent = '国土地理院の標高データと基盤地図を表示';
+                } else {
+                    infoDesc.textContent = '国土地理院の標高データを Terrarium 形式で可視化';
+                }
+            }
+        }
+
+        // Event handlers for dropdown changes: update fragment and apply without reload
         themeSelect.addEventListener('change', (e) => {
-            updateAndReload(e.target.value, terrain);
+            updateAndApply(e.target.value, terrain);
         });
 
         terrainSelect.addEventListener('change', (e) => {
-            updateAndReload(theme, e.target.value);
+            updateAndApply(theme, e.target.value);
+        });
+
+        // Also respond to external hash changes (e.g., user pasted URL)
+        window.addEventListener('hashchange', () => {
+            applyHashParamsToMap();
         });
 
         // Initialize the map
