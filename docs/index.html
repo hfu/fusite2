@@ -195,6 +195,20 @@
         }
 
         /**
+         * Create terrain source configuration
+         */
+        function createTerrainSource(terrainTiles) {
+            return {
+                type: 'raster-dem',
+                tiles: terrainTiles,
+                encoding: 'terrarium',
+                tileSize: 512,
+                minzoom: 0,
+                maxzoom: 16
+            };
+        }
+
+        /**
          * Build the style object based on theme and terrain
          */
         async function buildStyle(terrainTileJsonUrl, theme, exaggeration) {
@@ -220,26 +234,12 @@
                 version: 8,
                 glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
                 sources: {
-                    terrainSource: {
-                            type: 'raster-dem',
-                            tiles: terrainTiles,
-                            encoding: 'terrarium',
-                            tileSize: 512,
-                            minzoom: 0,
-                            maxzoom: 16
-                        },
+                    terrainSource: createTerrainSource(terrainTiles),
                     // Separate source for hillshade layers to avoid using the same
                     // source object for both 3D terrain and hillshade rendering.
                     // Using two sources (even pointing to the same tiles) improves
                     // rendering quality and avoids MapLibre warnings.
-                    hillshadeSource: {
-                            type: 'raster-dem',
-                            tiles: terrainTiles,
-                            encoding: 'terrarium',
-                            tileSize: 512,
-                            minzoom: 0,
-                            maxzoom: 16
-                        }
+                    hillshadeSource: createTerrainSource(terrainTiles)
                 },
                 layers: [],
                 terrain: {
