@@ -31,6 +31,7 @@
             <select id="theme-select">
                 <option value="osm">OSM</option>
                 <option value="gsi">GSI</option>
+                <option value="gsi-ortho">地理院オルソ</option>
                 <option value="contour">等高線</option>
                 <option value="lineage">元データ</option>
             </select>
@@ -117,6 +118,97 @@
         let map = null;
 
         /**
+         * Common sky configuration for themes that display 3D terrain
+         */
+        function getDefaultSkyConfig() {
+            return {
+                'sky-color': '#87CEEB',
+                'sky-horizon-blend': 0.5,
+                'horizon-color': '#ffffff',
+                'horizon-fog-blend': 0.5,
+                'fog-color': '#ffffff',
+                'fog-ground-blend': 0.5
+            };
+        }
+
+        /**
+         * Common background layer configuration
+         */
+        function getBackgroundLayer() {
+            return {
+                id: 'background',
+                type: 'background',
+                paint: {
+                    'background-color': '#e0e0e0'
+                }
+            };
+        }
+
+        /**
+         * Common hillshade layer configuration
+         * @param {number} exaggeration - Hillshade exaggeration value (default: 0.3)
+         */
+        function getHillshadeLayer(exaggeration = 0.3) {
+            return {
+                id: 'hillshade',
+                type: 'hillshade',
+                source: 'hillshadeSource',
+                paint: {
+                    'hillshade-exaggeration': exaggeration,
+                    'hillshade-shadow-color': '#473B24'
+                }
+            };
+        }
+
+        /**
+         * GSI-style hillshade with highlight color
+         */
+        function getGsiHillshadeLayer() {
+            return {
+                id: 'hillshade',
+                type: 'hillshade',
+                source: 'hillshadeSource',
+                paint: {
+                    'hillshade-exaggeration': 0.2,
+                    'hillshade-highlight-color': 'rgb(255,255,235)',
+                    'hillshade-shadow-color': 'rgb(110,120,130)'
+                }
+            };
+        }
+
+        /**
+         * Update info panel description based on current theme
+         */
+        function updateInfoDescription(theme) {
+            const infoDesc = document.getElementById('info-description');
+            if (!infoDesc) return;
+
+            const descriptions = {
+                'contour': 'Terrarium 標高タイルから動的に等高線を生成',
+                'gsi': '国土地理院の標高データと基盤地図を表示',
+                'gsi-ortho': '国土地理院のシームレス写真タイルと標高データを表示',
+                'lineage': '地形に対応した Lineage 画像タイルを表示（terrain に "-lineage" を付加したタイル）',
+                'osm': '国土地理院の標高データを Terrarium 形式で可視化'
+            };
+
+            infoDesc.textContent = descriptions[theme] || descriptions['osm'];
+        }
+
+        /**
+         * Create terrain source configuration
+         */
+        function createTerrainSource(terrainTiles) {
+            return {
+                type: 'raster-dem',
+                tiles: terrainTiles,
+                encoding: 'terrarium',
+                tileSize: 512,
+                minzoom: 0,
+                maxzoom: 16
+            };
+        }
+
+        /**
          * Build the style object based on theme and terrain
          */
         async function buildStyle(terrainTileJsonUrl, theme, exaggeration) {
@@ -142,26 +234,12 @@
                 version: 8,
                 glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
                 sources: {
-                    terrainSource: {
-                            type: 'raster-dem',
-                            tiles: terrainTiles,
-                            encoding: 'terrarium',
-                            tileSize: 512,
-                            minzoom: 0,
-                            maxzoom: 16
-                        },
+                    terrainSource: createTerrainSource(terrainTiles),
                     // Separate source for hillshade layers to avoid using the same
                     // source object for both 3D terrain and hillshade rendering.
                     // Using two sources (even pointing to the same tiles) improves
                     // rendering quality and avoids MapLibre warnings.
-                    hillshadeSource: {
-                            type: 'raster-dem',
-                            tiles: terrainTiles,
-                            encoding: 'terrarium',
-                            tileSize: 512,
-                            minzoom: 0,
-                            maxzoom: 16
-                        }
+                    hillshadeSource: createTerrainSource(terrainTiles)
                 },
                 layers: [],
                 terrain: {
@@ -175,6 +253,8 @@
                 return buildOsmStyle(style);
             } else if (theme === 'gsi') {
                 return buildGsiStyle(style);
+            } else if (theme === 'gsi-ortho') {
+                return buildGsiOrthoStyle(style);
             } else if (theme === 'contour') {
                 return buildContourStyle(style, terrainTiles[0]);
             } else if (theme === 'lineage') {
@@ -190,9 +270,9 @@
                     const tj = await resp.json();
                     lineageTiles = tj.tiles;
                     // If TileJSON provides metadata, propagate it to the source
-                    var lineageTileSize = tj.tileSize || tj.tilesize || tj.tilesize || 256;
-                    var lineageMaxzoom = tj.maxzoom || tj.maxZoom || tj.maxZoom || 19;
-                    var lineageAttribution = tj.attribution || tj.attribution || '';
+                    var lineageTileSize = tj.tileSize || tj.tilesize || 256;
+                    var lineageMaxzoom = tj.maxzoom || tj.maxZoom || 19;
+                    var lineageAttribution = tj.attribution || '';
                 } catch (e) {
                     console.warn('Failed to fetch lineage TileJSON, falling back to heuristic tile URLs:', e);
                     // Derive terrain name from the provided TileJSON URL
@@ -224,13 +304,7 @@
                 };
 
                 style.layers = [
-                    {
-                        id: 'background',
-                        type: 'background',
-                        paint: {
-                            'background-color': '#e0e0e0'
-                        }
-                    },
+                    getBackgroundLayer(),
                     {
                         id: 'lineage',
                         type: 'raster',
@@ -239,25 +313,10 @@
                             'raster-opacity': 1.0
                         }
                     },
-                    {
-                        id: 'hillshade',
-                        type: 'hillshade',
-                        source: 'hillshadeSource',
-                        paint: {
-                            'hillshade-exaggeration': 0.3,
-                            'hillshade-shadow-color': '#473B24'
-                        }
-                    }
+                    getHillshadeLayer()
                 ];
 
-                style.sky = {
-                    'sky-color': '#87CEEB',
-                    'sky-horizon-blend': 0.5,
-                    'horizon-color': '#ffffff',
-                    'horizon-fog-blend': 0.5,
-                    'fog-color': '#ffffff',
-                    'fog-ground-blend': 0.5
-                };
+                style.sky = getDefaultSkyConfig();
 
                 return style;
             }
@@ -279,13 +338,7 @@
             };
 
             style.layers = [
-                {
-                    id: 'background',
-                    type: 'background',
-                    paint: {
-                        'background-color': '#e0e0e0'
-                    }
-                },
+                getBackgroundLayer(),
                 {
                     id: 'osm',
                     type: 'raster',
@@ -294,25 +347,10 @@
                         'raster-opacity': 0.7
                     }
                 },
-                {
-                    id: 'hillshade',
-                    type: 'hillshade',
-                    source: 'hillshadeSource',
-                    paint: {
-                        'hillshade-exaggeration': 0.3,
-                        'hillshade-shadow-color': '#473B24'
-                    }
-                }
+                getHillshadeLayer()
             ];
 
-            style.sky = {
-                'sky-color': '#87CEEB',
-                'sky-horizon-blend': 0.5,
-                'horizon-color': '#ffffff',
-                'horizon-fog-blend': 0.5,
-                'fog-color': '#ffffff',
-                'fog-ground-blend': 0.5
-            };
+            style.sky = getDefaultSkyConfig();
 
             return style;
         }
@@ -327,23 +365,8 @@
             };
 
             style.layers = [
-                {
-                    id: 'background',
-                    type: 'background',
-                    paint: {
-                        'background-color': '#e0e0e0'
-                    }
-                },
-                {
-                    id: 'hillshade',
-                    type: 'hillshade',
-                    source: 'hillshadeSource',
-                    paint: {
-                        'hillshade-exaggeration': 0.2,
-                        'hillshade-highlight-color': 'rgb(255,255,235)',
-                        'hillshade-shadow-color': 'rgb(110,120,130)'
-                    }
-                },
+                getBackgroundLayer(),
+                getGsiHillshadeLayer(),
                 {
                     id: '行政区画',
                     type: 'fill',
@@ -695,6 +718,36 @@
         }
 
         /**
+         * GSI Ortho theme style (seamlessphoto)
+         */
+        function buildGsiOrthoStyle(style) {
+            style.sources['gsi-ortho'] = {
+                type: 'raster',
+                tiles: ['https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg'],
+                tileSize: 256,
+                attribution: '&copy; <a href="https://www.gsi.go.jp/" target="_blank" rel="noopener noreferrer">国土地理院</a>',
+                maxzoom: 18
+            };
+
+            style.layers = [
+                getBackgroundLayer(),
+                {
+                    id: 'gsi-ortho',
+                    type: 'raster',
+                    source: 'gsi-ortho',
+                    paint: {
+                        'raster-opacity': 1.0
+                    }
+                },
+                getHillshadeLayer()
+            ];
+
+            style.sky = getDefaultSkyConfig();
+
+            return style;
+        }
+
+        /**
          * Contour theme style (reproduces contour.html)
          */
         function buildContourStyle(style, terrainTileUrl) {
@@ -731,23 +784,8 @@
             };
 
             style.layers = [
-                {
-                    id: 'background',
-                    type: 'background',
-                    paint: {
-                        'background-color': '#e0e0e0'
-                    }
-                },
-                {
-                    id: 'hillshade',
-                    type: 'hillshade',
-                    source: 'hillshadeSource',
-                    paint: {
-                        'hillshade-exaggeration': 0.2,
-                        'hillshade-highlight-color': 'rgb(255,255,235)',
-                        'hillshade-shadow-color': 'rgb(110,120,130)'
-                    }
-                },
+                getBackgroundLayer(),
+                getGsiHillshadeLayer(),
                 {
                     id: 'contours',
                     type: 'line',
@@ -867,39 +905,8 @@
                 trackUserLocation: true
             }), 'top-right');
 
-            // Custom Globe Control
-            class GlobeControl {
-                constructor() {
-                    this._isGlobeView = true;
-                }
-
-                onAdd(map) {
-                    this._map = map;
-                    this._container = document.createElement('div');
-                    this._container.className = 'maplibregl-ctrl maplibregl-ctrl-group';
-                    this._button = document.createElement('button');
-                    this._button.className = 'maplibregl-ctrl-icon';
-                    this._button.type = 'button';
-                    this._button.title = 'Globe/Mercator 切替';
-                    this._button.innerHTML = '🌐';
-                    this._button.style.fontSize = '18px';
-                    this._button.onclick = () => {
-                        this._isGlobeView = !this._isGlobeView;
-                        map.setProjection(this._isGlobeView ? 'globe' : 'mercator');
-                        this._button.innerHTML = this._isGlobeView ? '🌐' : '🗺️';
-                    };
-                    this._container.appendChild(this._button);
-                    return this._container;
-                }
-
-                onRemove() {
-                    this._container.parentNode.removeChild(this._container);
-                    this._map = undefined;
-                }
-            }
-
-            // Add Globe control
-            map.addControl(new GlobeControl(), 'top-right');
+            // Add native Globe control
+            map.addControl(new maplibregl.GlobeControl(), 'top-right');
 
             // Custom Terrain Exaggeration Control
             class TerrainExaggerationControl {
@@ -978,16 +985,7 @@
                 }
 
                 // Update info panel description based on theme
-                const infoDesc = document.getElementById('info-description');
-                if (theme === 'contour') {
-                    infoDesc.textContent = 'Terrarium 標高タイルから動的に等高線を生成';
-                } else if (theme === 'gsi') {
-                    infoDesc.textContent = '国土地理院の標高データと基盤地図を表示';
-                } else if (theme === 'lineage') {
-                    infoDesc.textContent = '地形に対応した Lineage 画像タイルを表示（terrain に "-lineage" を付加したタイル）';
-                } else {
-                    infoDesc.textContent = '国土地理院の標高データを Terrarium 形式で可視化';
-                }
+                updateInfoDescription(theme);
 
                 // Set initial hash if not already set
                 if (!hashParams.map) {
@@ -1041,24 +1039,11 @@
          * immediately.
          */
         async function updateAndApply(newTheme, newTerrain) {
-            // Build merged params and new hash
-            const currentParams = parseHashParams();
-            const mergedParams = {
-                ...currentParams,
+            // Update hash parameters
+            updateHashParams({
                 theme: newTheme,
                 terrain: newTerrain
-            };
-
-            const hashParts = [];
-            for (const [key, value] of Object.entries(mergedParams)) {
-                if (value !== undefined && value !== null) {
-                    hashParts.push(`${key}=${value}`);
-                }
-            }
-
-            const newHash = hashParts.join('&');
-            // Update the URL fragment without creating a history entry
-            history.replaceState(null, '', '#' + newHash);
+            });
 
             // Re-parse and apply to map
             await applyHashParamsToMap();
@@ -1092,18 +1077,7 @@
             map.setStyle(style);
 
             // Update info description to reflect new theme immediately
-            const infoDesc = document.getElementById('info-description');
-            if (infoDesc) {
-                if (theme === 'contour') {
-                    infoDesc.textContent = 'Terrarium 標高タイルから動的に等高線を生成';
-                } else if (theme === 'gsi') {
-                    infoDesc.textContent = '国土地理院の標高データと基盤地図を表示';
-                } else if (theme === 'lineage') {
-                    infoDesc.textContent = '地形に対応した Lineage 画像タイルを表示（terrain に "-lineage" を付加したタイル）';
-                } else {
-                    infoDesc.textContent = '国土地理院の標高データを Terrarium 形式で可視化';
-                }
-            }
+            updateInfoDescription(theme);
         }
 
         // Event handlers for dropdown changes: update fragment and apply without reload
