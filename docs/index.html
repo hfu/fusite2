@@ -177,6 +177,24 @@
         }
 
         /**
+         * Update info panel description based on current theme
+         */
+        function updateInfoDescription(theme) {
+            const infoDesc = document.getElementById('info-description');
+            if (!infoDesc) return;
+
+            const descriptions = {
+                'contour': 'Terrarium 標高タイルから動的に等高線を生成',
+                'gsi': '国土地理院の標高データと基盤地図を表示',
+                'gsi-ortho': '国土地理院のシームレス写真タイルと標高データを表示',
+                'lineage': '地形に対応した Lineage 画像タイルを表示（terrain に "-lineage" を付加したタイル）',
+                'osm': '国土地理院の標高データを Terrarium 形式で可視化'
+            };
+
+            infoDesc.textContent = descriptions[theme] || descriptions['osm'];
+        }
+
+        /**
          * Build the style object based on theme and terrain
          */
         async function buildStyle(terrainTileJsonUrl, theme, exaggeration) {
@@ -967,18 +985,7 @@
                 }
 
                 // Update info panel description based on theme
-                const infoDesc = document.getElementById('info-description');
-                if (theme === 'contour') {
-                    infoDesc.textContent = 'Terrarium 標高タイルから動的に等高線を生成';
-                } else if (theme === 'gsi') {
-                    infoDesc.textContent = '国土地理院の標高データと基盤地図を表示';
-                } else if (theme === 'gsi-ortho') {
-                    infoDesc.textContent = '国土地理院のシームレス写真タイルと標高データを表示';
-                } else if (theme === 'lineage') {
-                    infoDesc.textContent = '地形に対応した Lineage 画像タイルを表示（terrain に "-lineage" を付加したタイル）';
-                } else {
-                    infoDesc.textContent = '国土地理院の標高データを Terrarium 形式で可視化';
-                }
+                updateInfoDescription(theme);
 
                 // Set initial hash if not already set
                 if (!hashParams.map) {
@@ -1032,24 +1039,11 @@
          * immediately.
          */
         async function updateAndApply(newTheme, newTerrain) {
-            // Build merged params and new hash
-            const currentParams = parseHashParams();
-            const mergedParams = {
-                ...currentParams,
+            // Update hash parameters
+            updateHashParams({
                 theme: newTheme,
                 terrain: newTerrain
-            };
-
-            const hashParts = [];
-            for (const [key, value] of Object.entries(mergedParams)) {
-                if (value !== undefined && value !== null) {
-                    hashParts.push(`${key}=${value}`);
-                }
-            }
-
-            const newHash = hashParts.join('&');
-            // Update the URL fragment without creating a history entry
-            history.replaceState(null, '', '#' + newHash);
+            });
 
             // Re-parse and apply to map
             await applyHashParamsToMap();
@@ -1083,20 +1077,7 @@
             map.setStyle(style);
 
             // Update info description to reflect new theme immediately
-            const infoDesc = document.getElementById('info-description');
-            if (infoDesc) {
-                if (theme === 'contour') {
-                    infoDesc.textContent = 'Terrarium 標高タイルから動的に等高線を生成';
-                } else if (theme === 'gsi') {
-                    infoDesc.textContent = '国土地理院の標高データと基盤地図を表示';
-                } else if (theme === 'gsi-ortho') {
-                    infoDesc.textContent = '国土地理院のシームレス写真タイルと標高データを表示';
-                } else if (theme === 'lineage') {
-                    infoDesc.textContent = '地形に対応した Lineage 画像タイルを表示（terrain に "-lineage" を付加したタイル）';
-                } else {
-                    infoDesc.textContent = '国土地理院の標高データを Terrarium 形式で可視化';
-                }
-            }
+            updateInfoDescription(theme);
         }
 
         // Event handlers for dropdown changes: update fragment and apply without reload
