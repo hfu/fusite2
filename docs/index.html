@@ -1,7 +1,81 @@
 <!DOCTYPE html>
 <html lang="ja">
+<<<<<<< HEAD
             // Add native Globe control
             map.addControl(new maplibregl.GlobeControl(), 'top-right');
+=======
+
+<head>
+    <meta charset="utf-8" />
+    <title>fusite2 - 標高タイル可視化</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="国土地理院の標高データを WebP Terrarium タイルとして可視化 - 拡張版" />
+
+    <!-- MapLibre GL JS (use modern 5.x release) -->
+    <script src="https://unpkg.com/maplibre-gl@^5.13.0/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@^5.13.0/dist/maplibre-gl.css" rel="stylesheet" />
+
+    <!-- maplibre-contour for contour theme -->
+    <script src="https://unpkg.com/maplibre-contour@0.0.5/dist/index.min.js"></script>
+
+    <link href="style.css" rel="stylesheet" />
+</head>
+
+<body class="has-info-toggle">
+    <div id="map"></div>
+
+    <button id="info-toggle" class="info-toggle" aria-expanded="false" aria-controls="info-panel" title="情報を開く">ℹ️</button>
+
+    <div id="info-panel" class="info-panel hidden" aria-hidden="true">
+        <h1>fusite2</h1>
+        <p id="info-description">国土地理院の標高データを Terrarium 形式で可視化</p>
+        
+        <div class="control-group">
+            <label for="theme-select">テーマ:</label>
+            <select id="theme-select">
+                <option value="osm">OSM</option>
+                <option value="gsi">GSI</option>
+                <option value="contour">等高線</option>
+                <option value="lineage">元データ</option>
+            </select>
+        </div>
+        
+        <div class="control-group">
+            <label for="terrain-select">地形:</label>
+            <select id="terrain-select">
+                <option value="fusi">fusi</option>
+                <option value="iwaki">iwaki</option>
+                <option value="shimabara">shimabara</option>
+                <option value="fuji">fuji</option>
+                <option value="dem10">dem10</option>
+            </select>
+        </div>
+        
+        <p class="attribution">
+            データ: <a href="https://www.gsi.go.jp/" target="_blank" rel="noopener noreferrer">国土地理院 (GSI Japan)</a><br>
+            測量法に基づく国土地理院長承認（使用）R 6JHs 133<br>
+            <br>
+            Inspired by <a href="https://github.com/mapterhorn/mapterhorn" target="_blank"
+                rel="noopener noreferrer">Mapterhorn</a><br>
+            Made with <a href="https://github.com/hfu/fusite2" target="_blank" rel="noopener noreferrer">fusite2</a>
+        </p>
+    </div>
+
+    <script type="text/javascript">
+        /**
+         * Parse URL fragment parameters
+         * Format: #map=z/lat/lng&terrain=xxx&theme=yyy
+         */
+        function parseHashParams() {
+            const hash = window.location.hash.substring(1);
+            const params = {};
+
+            if (!hash) return params;
+
+            // Split by & and parse each parameter
+            hash.split('&').forEach(part => {
+                const [key, value] = part.split('=');
+>>>>>>> 7ab248b (feat(terrain): add fuji and dem10 terrain options)
                 if (key && value !== undefined) {
                     params[key] = value;
                 }
