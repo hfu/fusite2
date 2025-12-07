@@ -1,10 +1,5 @@
 <!DOCTYPE html>
 <html lang="ja">
-<<<<<<< HEAD
-            // Add native Globe control
-            map.addControl(new maplibregl.GlobeControl(), 'top-right');
-=======
-
 <head>
     <meta charset="utf-8" />
     <title>fusite2 - 標高タイル可視化</title>
@@ -75,7 +70,6 @@
             // Split by & and parse each parameter
             hash.split('&').forEach(part => {
                 const [key, value] = part.split('=');
->>>>>>> 7ab248b (feat(terrain): add fuji and dem10 terrain options)
                 if (key && value !== undefined) {
                     params[key] = value;
                 }
@@ -364,362 +358,68 @@
         /**
          * GSI theme style (reproduces index.html with bvmap)
          */
-        function buildGsiStyle(style) {
+        async function buildGsiStyle(style) {
+            // 1) 既存の terrain/hillshade は維持
+            // 2) bvmap-overdrive の std.json を取得し、sources/layers を取り込む
+
+            // ベクトルタイルソース（MLT）を設定
             style.sources.bvmap = {
                 type: 'vector',
                 url: 'https://tunnel.optgeo.org/martin/bvmap'
             };
 
-            style.layers = [
-                getBackgroundLayer(),
-                getGsiHillshadeLayer(),
-                {
-                    id: '行政区画',
-                    type: 'fill',
-                    source: 'bvmap',
-                    'source-layer': 'AdmArea',
-                    paint: {
-                        'fill-color': 'rgba(255,255,255,0)',
-                        'fill-outline-color': 'rgba(110,120,130,1)'
-                    }
-                },
-                {
-                    id: '水域',
-                    maxzoom: 17,
-                    type: 'fill',
-                    source: 'bvmap',
-                    'source-layer': 'WA',
-                    paint: {
-                        'fill-color': 'rgba(0,0,0,0)',
-                        'fill-outline-color': 'rgba(110,120,130,1)'
-                    }
-                },
-                {
-                    id: '地形表記面',
-                    type: 'fill',
-                    source: 'bvmap',
-                    maxzoom: 17,
-                    'source-layer': 'TpgphArea',
-                    paint: {
-                        'fill-color': 'rgba(0,0,0,0)',
-                        'fill-outline-color': 'rgba(110,120,130,1)'
-                    }
-                },
-                {
-                    id: '地形表記面2',
-                    type: 'fill',
-                    source: 'bvmap',
-                    'source-layer': 'TpgphArea',
-                    minzoom: 17,
-                    filter: [
-                        'in',
-                        ['get', 'vt_flag17'],
-                        ['literal', [1, 2]]
-                    ],
-                    paint: {
-                        'fill-color': 'rgba(0,0,0,0)',
-                        'fill-outline-color': 'rgba(110,120,130,1)'
-                    }
-                },
-                {
-                    id: '海岸線',
-                    type: 'line',
-                    source: 'bvmap',
-                    'source-layer': 'Cstline',
-                    paint: {
-                        'line-color': 'rgba(110,120,130,1)',
-                        'line-width': 1
-                    }
-                },
-                {
-                    id: '河川_線',
-                    type: 'line',
-                    source: 'bvmap',
-                    'source-layer': 'RvrCL',
-                    paint: {
-                        'line-color': 'rgba(110,120,130,1)',
-                        'line-width': 1
-                    }
-                },
-                {
-                    id: '水涯線',
-                    type: 'line',
-                    source: 'bvmap',
-                    'source-layer': 'WL',
-                    paint: {
-                        'line-color': 'rgba(110,120,130,1)',
-                        'line-width': 1
-                    }
-                },
-                {
-                    id: '水部表記線polygon',
-                    type: 'fill',
-                    source: 'bvmap',
-                    'source-layer': 'WRltLine',
-                    filter: [
-                        '==',
-                        ['geometry-type'],
-                        'Polygon'
-                    ],
-                    paint: {
-                        'fill-color': 'rgba(255,255,255,0)',
-                        'fill-outline-color': 'rgba(110,120,130,1)'
-                    }
-                },
-                {
-                    id: '水部表記線line',
-                    type: 'line',
-                    source: 'bvmap',
-                    'source-layer': 'WRltLine',
-                    filter: [
-                        '==',
-                        ['geometry-type'],
-                        'LineString'
-                    ],
-                    paint: {
-                        'line-color': 'rgba(110,120,130,1)',
-                        'line-width': 1
-                    }
-                },
-                {
-                    id: '行政区画界線',
-                    type: 'line',
-                    source: 'bvmap',
-                    'source-layer': 'AdmBdry',
-                    paint: {
-                        'line-color': 'rgba(110,120,130,1)',
-                        'line-width': 1
-                    }
-                },
-                {
-                    id: '等深線',
-                    type: 'line',
-                    source: 'bvmap',
-                    'source-layer': 'Isbt',
-                    paint: {
-                        'line-color': 'rgba(110,120,130,1)',
-                        'line-width': 1
-                    }
-                },
-                {
-                    id: '水部構造物面',
-                    type: 'fill',
-                    source: 'bvmap',
-                    'source-layer': 'WStrA',
-                    paint: {
-                        'fill-color': 'rgba(0,0,0,0)',
-                        'fill-outline-color': 'rgba(110,120,130,1)'
-                    }
-                },
-                {
-                    id: '水部構造物線',
-                    type: 'line',
-                    source: 'bvmap',
-                    'source-layer': 'WStrL',
-                    maxzoom: 17,
-                    filter: [
-                        'any',
-                        ['!', ['has', 'vt_flag17']],
-                        ['in', ['get', 'vt_flag17'], ['literal', [0, 1]]]
-                    ],
-                    paint: {
-                        'line-color': 'rgba(110,120,130,1)',
-                        'line-width': 1
-                    }
-                },
-                {
-                    id: '水部構造物線2',
-                    type: 'line',
-                    source: 'bvmap',
-                    'source-layer': 'WStrL',
-                    minzoom: 17,
-                    filter: [
-                        'in',
-                        ['get', 'vt_flag17'],
-                        ['literal', [1, 2]]
-                    ],
-                    paint: {
-                        'line-color': 'rgba(110,120,130,1)',
-                        'line-width': 1
-                    }
-                },
-                {
-                    id: '道路_線',
-                    type: 'line',
-                    source: 'bvmap',
-                    'source-layer': 'RdCL',
-                    maxzoom: 17,
-                    paint: {
-                        'line-color': [
-                            'case',
-                            ['==', ['get', 'vt_rnkwidth'], '不明'],
-                            'rgba(255,255,255,0)',
-                            'rgba(110,120,130,1)'
-                        ],
-                        'line-width': 1
-                    }
-                },
-                {
-                    id: '道路_線2',
-                    type: 'line',
-                    source: 'bvmap',
-                    'source-layer': 'RdCL',
-                    minzoom: 17,
-                    filter: [
-                        'all',
-                        ['in', ['get', 'vt_flag17'], ['literal', [1, 2]]]
-                    ],
-                    paint: {
-                        'line-color': 'rgba(110,120,130,1)',
-                        'line-width': 1
-                    }
-                },
-                {
-                    id: '鉄道_線',
-                    maxzoom: 17,
-                    type: 'line',
-                    source: 'bvmap',
-                    'source-layer': 'RailCL',
-                    paint: {
-                        'line-color': 'rgba(110,120,130,1)',
-                        'line-width': 1
-                    }
-                },
-                {
-                    id: '鉄道_線2',
-                    minzoom: 17,
-                    type: 'line',
-                    source: 'bvmap',
-                    'source-layer': 'RailCL',
-                    filter: [
-                        'all',
-                        ['in', ['get', 'vt_flag17'], ['literal', [1, 2]]]
-                    ],
-                    paint: {
-                        'line-color': 'rgba(110,120,130,1)',
-                        'line-width': 1
-                    }
-                },
-                {
-                    id: '建築物_外周線',
-                    type: 'line',
-                    source: 'bvmap',
-                    'source-layer': 'BldA',
-                    paint: {
-                        'line-color': 'rgba(110,120,130,1)',
-                        'line-width': 1
-                    }
-                },
-                {
-                    id: '地下駅',
-                    type: 'fill',
-                    source: 'bvmap',
-                    'source-layer': 'UndergroundStation',
-                    paint: {
-                        'fill-color': 'rgba(0,0,0,0)',
-                        'fill-outline-color': 'rgba(110,120,130,1)'
-                    }
-                },
-                {
-                    id: '道路縁',
-                    minzoom: 17,
-                    type: 'line',
-                    source: 'bvmap',
-                    'source-layer': 'RdEdg',
-                    paint: {
-                        'line-color': 'rgba(110,120,130,1)',
-                        'line-width': 1
-                    }
-                },
-                {
-                    id: '道路構成線',
-                    minzoom: 17,
-                    type: 'line',
-                    source: 'bvmap',
-                    'source-layer': 'RdCompt',
-                    paint: {
-                        'line-color': 'rgba(110,120,130,1)',
-                        'line-width': 1
-                    }
-                },
-                {
-                    id: '軌道_線',
-                    minzoom: 17,
-                    type: 'line',
-                    source: 'bvmap',
-                    'source-layer': 'RailTrCL',
-                    layout: {
-                        'line-sort-key': ['get', 'vt_drworder']
-                    },
-                    paint: {
-                        'line-color': 'rgba(110,120,130,1)',
-                        'line-width': 1
-                    }
-                },
-                {
-                    id: '特定地区界',
-                    type: 'line',
-                    source: 'bvmap',
-                    'source-layer': 'SpcfArea',
-                    paint: {
-                        'line-color': 'rgba(110,120,130,1)',
-                        'line-width': 1
-                    }
-                },
-                {
-                    id: '構造物面',
-                    type: 'fill',
-                    source: 'bvmap',
-                    'source-layer': 'StrctArea',
-                    paint: {
-                        'fill-color': 'rgba(0,0,0,0)',
-                        'fill-outline-color': 'rgba(110,120,130,1)'
-                    }
-                },
-                {
-                    id: '構造物面の外周線',
-                    type: 'line',
-                    source: 'bvmap',
-                    'source-layer': 'StrctArea',
-                    paint: {
-                        'line-color': 'rgba(110,120,130,1)',
-                        'line-width': 1
-                    }
-                },
-                {
-                    id: '構造物線',
-                    type: 'line',
-                    source: 'bvmap',
-                    'source-layer': 'StrctLine',
-                    minzoom: 17,
-                    paint: {
-                        'line-color': 'rgba(110,120,130,1)',
-                        'line-width': 1
-                    }
-                },
-                {
-                    id: '交通トンネル口',
-                    type: 'line',
-                    source: 'bvmap',
-                    'source-layer': 'TrfTnnlEnt',
-                    minzoom: 17,
-                    paint: {
-                        'line-color': 'rgba(110,120,130,1)',
-                        'line-width': 1
-                    }
-                },
-                {
-                    id: '送電線',
-                    type: 'line',
-                    source: 'bvmap',
-                    'source-layer': 'PwrTrnsmL',
-                    paint: {
-                        'line-color': 'rgba(110,120,130,1)',
-                        'line-width': 1
-                    }
-                }
-            ];
+            // 背景レイヤは常に最初
+            const mergedLayers = [getBackgroundLayer()];
 
+            let std;
+            try {
+                const resp = await fetch('https://raw.githubusercontent.com/optgeo/bvmap-overdrive/main/docs/std.json');
+                if (!resp.ok) throw new Error(`fetch std.json failed: ${resp.status}`);
+                std = await resp.json();
+            } catch (e) {
+                console.error('std.json の取得に失敗:', e);
+                // フォールバック: 薄い GSI 風に戻す
+                mergedLayers.push(getGsiHillshadeLayer());
+                style.layers = mergedLayers;
+                style.sky = getDefaultSkyConfig();
+                return style;
+            }
+
+            // std.json には `sources` と `layers` が含まれているため、
+            // 我々の style.sources に必要なものだけ取り込む。
+            // 注意: terrainSource/hillshadeSource は置き換えない。
+            if (std.sources) {
+                for (const [key, src] of Object.entries(std.sources)) {
+                    // bvmap（ベクトル）はローカル URL を優先
+                    if (key === 'bvmap') continue; // 既に設定済み
+                    // 他の必要ソース（フォント等）は基本的に不要のはず。必要なら追加。
+                    // ここでは安全のため追加しない。
+                }
+            }
+
+            // レイヤ取り込み。hillshade は塗りレイヤ（AdmArea 等）より前に配置。
+            // ルール: まず hillshade、次に std.json のレイヤ群を順番通りに挿入。
+            mergedLayers.push(getGsiHillshadeLayer());
+
+            const existingIds = new Set(mergedLayers.map(l => l.id));
+            if (Array.isArray(std.layers)) {
+                for (const lyr of std.layers) {
+                    // terrain/hillshade を壊さないため、source が 'terrainSource'/'hillshadeSource' のものはスキップ。
+                    if (lyr.source === 'terrainSource' || lyr.source === 'hillshadeSource') continue;
+                    // source が 'bvmap' のものはそのまま適用。その他の source は未知ならスキップ。
+                    if (lyr.source && lyr.source !== 'bvmap') continue;
+                    // 背景は既に追加済みなのでスキップ（重複回避）。
+                    if (lyr.id === 'background') continue;
+                    // 重複 ID のレイヤはスキップ。
+                    if (lyr.id && existingIds.has(lyr.id)) continue;
+
+                    mergedLayers.push(lyr);
+                    if (lyr.id) existingIds.add(lyr.id);
+                }
+            }
+
+            style.layers = mergedLayers;
+            style.sky = getDefaultSkyConfig();
             return style;
         }
 
