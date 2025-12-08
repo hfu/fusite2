@@ -169,9 +169,12 @@
                 type: 'hillshade',
                 source: 'hillshadeSource',
                 paint: {
-                    'hillshade-exaggeration': 0.2,
-                    'hillshade-highlight-color': 'rgb(255,255,235)',
-                    'hillshade-shadow-color': 'rgb(110,120,130)'
+                    'hillshade-exaggeration': 0.4,
+                    'hillshade-highlight-color': 'rgb(255,250,220)',
+                    'hillshade-shadow-color': 'rgb(80,85,95)',
+                    'hillshade-accent-color': 'rgb(210,200,180)',
+                    'hillshade-illumination-direction': 315,
+                    'hillshade-illumination-anchor': 'viewport'
                 }
             };
         }
@@ -362,14 +365,18 @@
             // 1) 既存の terrain/hillshade は維持
             // 2) bvmap-overdrive の std.json を取得し、sources/layers を取り込む
 
-            // ベクトルタイルソース（MLT）を設定
-            style.sources.bvmap = {
+            // ベクトルタイルソース（MLT）: bvmap-overdrive を使用
+            style.sources['bvmap-overdrive'] = {
                 type: 'vector',
-                url: 'https://tunnel.optgeo.org/martin/bvmap'
+                minzoom: 4,
+                maxzoom: 16,
+                tiles: ['https://tunnel.optgeo.org/martin/bvmap-overdrive/{z}/{x}/{y}'],
+                attribution: '国土地理院最適化ベクトルタイル(MLT; 標準地図風スタイル)',
+                encoding: 'mlt'
             };
 
-            // 背景レイヤは常に最初
-            const mergedLayers = [getBackgroundLayer()];
+            // 背景レイヤは std.json の定義があればそれを優先（なければ既定背景）
+            let mergedLayers = [];
 
             let std;
             try {
@@ -385,29 +392,54 @@
                 return style;
             }
 
-            // std.json には `sources` と `layers` が含まれているため、
-            // 我々の style.sources に必要なものだけ取り込む。
-            // 注意: terrainSource/hillshadeSource は置き換えない。
+            // std.json の sources 解析: ベクトルで bvmap-overdrive を指すソースを 'bvmap-overdrive' へ集約
+            const sourceAliasToBvmapOverdrive = new Set();
             if (std.sources) {
                 for (const [key, src] of Object.entries(std.sources)) {
-                    // bvmap（ベクトル）はローカル URL を優先
-                    if (key === 'bvmap') continue; // 既に設定済み
-                    // 他の必要ソース（フォント等）は基本的に不要のはず。必要なら追加。
-                    // ここでは安全のため追加しない。
+                    if (src && src.type === 'vector') {
+                        const url = src.url || src.tiles && src.tiles[0] || '';
+                        if (typeof url === 'string' && url.includes('bvmap-overdrive')) {
+                            sourceAliasToBvmapOverdrive.add(key);
+                        }
+                    }
                 }
             }
 
-            // レイヤ取り込み。hillshade は塗りレイヤ（AdmArea 等）より前に配置。
-            // ルール: まず hillshade、次に std.json のレイヤ群を順番通りに挿入。
-            mergedLayers.push(getGsiHillshadeLayer());
+            // sprite/glyphs が定義されていれば取り込み（既存 glyphs より優先）
+            if (std.sprite) {
+                style.sprite = std.sprite;
+            }
+            if (std.glyphs) {
+                style.glyphs = std.glyphs;
+            }
+
+            // レイヤ取り込み。まず std.json の background を先頭に配置（存在すれば）。
+            // つづいて AdmArea（行政区画）レイヤの直後に hillshade を挿入する。
+            let hillshadeInserted = false;
+            let backgroundInserted = false;
 
             const existingIds = new Set(mergedLayers.map(l => l.id));
             if (Array.isArray(std.layers)) {
                 for (const lyr of std.layers) {
+                    // 背景レイヤ検出: type が background のものを先頭に一度だけ挿入
+                    if (!backgroundInserted && lyr.type === 'background') {
+                        if (!lyr.id || !existingIds.has(lyr.id)) {
+                            mergedLayers.push(lyr);
+                            if (lyr.id) existingIds.add(lyr.id);
+                        }
+                        backgroundInserted = true;
+                        continue;
+                    }
                     // terrain/hillshade を壊さないため、source が 'terrainSource'/'hillshadeSource' のものはスキップ。
                     if (lyr.source === 'terrainSource' || lyr.source === 'hillshadeSource') continue;
-                    // source が 'bvmap' のものはそのまま適用。その他の source は未知ならスキップ。
-                    if (lyr.source && lyr.source !== 'bvmap') continue;
+                    // bvmap-overdrive を指す別名ソースは 'bvmap-overdrive' に付け替え、それ以外の未知ソースはスキップ。
+                    if (lyr.source && lyr.source !== 'bvmap-overdrive') {
+                        if (sourceAliasToBvmapOverdrive.has(lyr.source)) {
+                            lyr.source = 'bvmap-overdrive';
+                        } else {
+                            continue;
+                        }
+                    }
                     // 背景は既に追加済みなのでスキップ（重複回避）。
                     if (lyr.id === 'background') continue;
                     // 重複 ID のレイヤはスキップ。
@@ -415,7 +447,25 @@
 
                     mergedLayers.push(lyr);
                     if (lyr.id) existingIds.add(lyr.id);
+                    if (!hillshadeInserted && (lyr.id === '行政区画' || lyr['source-layer'] === 'AdmArea')) {
+                        mergedLayers.push(getGsiHillshadeLayer());
+                        hillshadeInserted = true;
+                    }
                 }
+            }
+
+            // フォールバック: AdmArea が見つからなければ背景直後に hillshade を挿入
+            if (!hillshadeInserted) {
+                // 背景が未挿入なら既定背景を先頭に追加
+                if (!backgroundInserted) {
+                    mergedLayers.unshift(getBackgroundLayer());
+                }
+                const bgIndex = mergedLayers.findIndex(l => l.type === 'background');
+                const insertPos = bgIndex >= 0 ? bgIndex + 1 : 1;
+                mergedLayers.splice(insertPos, 0, getGsiHillshadeLayer());
+            } else if (!backgroundInserted) {
+                // 背景がまだなければ既定背景を先頭に追加
+                mergedLayers.unshift(getBackgroundLayer());
             }
 
             style.layers = mergedLayers;

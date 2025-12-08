@@ -9,7 +9,7 @@
 注: UI（情報パネル）の `theme` / `terrain` ドロップダウンで選択すると、ページ全体を再読み込みせずに地図表示が即時に切り替わります。URL フラグメントは内部的に更新され、ブラウザの履歴に残したくない場合は同一履歴エントリが置き換えられます。
 
 ### パラメータ
-
+ **`gsi`**: 国土地理院の最適化ベクトルタイル（bvmap-overdrive, MLT）を使用。`std.json` スタイルを取り込み、行政区画・道路・鉄道・建物など詳細な地理情報を表示。背景は `std.json` の `background` を優先採用し、陰影（hillshade）は「行政区画（AdmArea）」の直後に挿入してベースの立体感を強調します。地形（`terrainSource`）と陰影（`hillshadeSource`）は当サイト側で制御し、`std.json` のソースとは独立に維持します。
 | パラメータ | 説明 | デフォルト値 | 例 |
 |-----------|------|-------------|-----|
 | `map` | MapLibre GL JS の map hash 形式 (`zoom/lat/lng/pitch/bearing`) | `14.74/32.75055/129.87255/16.2/6` | `14/35.6812/139.7671/45/0` |
@@ -17,10 +17,17 @@
 | `theme` | 地形の上に載せる地図スタイル | `osm` | `osm`, `gsi`, `gsi-ortho`, `contour`, `lineage` |
 | `exag` | 地形強調度（0〜3の範囲で指定可能） | `1` | `1.5`, `2.0` |
 
+### GSI テーマのベクトルタイル（MLT）
+
+- **ベクトルタイル**: `https://tunnel.optgeo.org/martin/bvmap-overdrive/{z}/{x}/{y}`
+- **エンコーディング**: `mlt`
+- **ズーム範囲**: 4-16
+- **スタイル**: `https://raw.githubusercontent.com/optgeo/bvmap-overdrive/main/docs/std.json` を取得してレイヤ/背景を統合
+- **背景**: `std.json` の `background` が存在すれば採用、なければ既定背景を使用
+- **陰影**: レイヤ統合時に「行政区画（AdmArea）」の直後へ挿入（見つからない場合は背景直後）
+
 注: `lineage` テーマを使うときは、対応する画像タイルを示す TileJSON を `https://tunnel.optgeo.org/martin/{terrain}-lineage` から取得します（例: `terrain=iwaki` と `theme=lineage` の組合せでは `https://tunnel.optgeo.org/martin/iwaki-lineage` を参照します）。
-
-### テーマ
-
+**エンコーディング**: Terrarium (mapterhorn 互換) / MLT（GSI テーマ）
 - **`osm`** (デフォルト): OpenStreetMap ラスタータイルを背景に表示。
 - **`gsi`**: 国土地理院の基盤地図情報（bvmap）ベクトルタイルを使用。行政区画、道路、鉄道、建物など詳細な地理情報を表示。
 - **`gsi-ortho`**: 国土地理院のシームレス写真（seamlessphoto）タイルを背景に表示。航空写真と標高データを組み合わせた立体表示。
@@ -46,18 +53,23 @@ https://hfu.github.io/fusite2/#map=13/37.0/140.9/30/0&terrain=iwaki&theme=contou
 https://hfu.github.io/fusite2/#map=14/32.75/129.87/20/0&terrain=shimabara&theme=osm&exag=2.0
 ```
 
+注: UI（情報パネル）の `theme` / `terrain` ドロップダウンで選択すると、ページ全体を再読み込みせずに地図表示が即時に切り替わります。URL フラグメントは内部的に更新され、ブラウザの履歴に残したくない場合は同一履歴エントリが置き換えられます。
+
 ## コントロール
 
 ### 右上のコントロール
+
 - **NavigationControl**: ズーム、回転、ピッチ調整
 - **FullscreenControl**: フルスクリーン表示
 - **GeolocateControl**: 現在地表示
 - **GlobeControl**: Globe/Mercator 投影法の切替（MapLibre GL JS 標準コントロール）
 
 ### 左下のコントロール
+
 - **TerrainExaggerationControl**: 地形強調度のスライダー（0〜3倍）
 
 ### 左上のパネル
+
 - **情報パネル**: テーマ・地形の切り替えドロップダウン、サイト情報
 
 ## データソース
@@ -97,7 +109,7 @@ python3 -m http.server 8000
 npx http-server docs -p 8000
 ```
 
-ブラウザで http://localhost:8000 を開いてください。
+ブラウザで <http://localhost:8000> を開いてください。
 
 ## GitHub Pages での公開
 
