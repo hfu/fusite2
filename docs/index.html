@@ -384,14 +384,19 @@
             const pagesStdUrl = 'https://optgeo.github.io/bvmap-overdrive/std.json';
             const rawStdUrl = 'https://raw.githubusercontent.com/optgeo/bvmap-overdrive/main/docs/std.json';
             try {
+                // Track which URL we actually used to load std.json for debugging
+                let usedStdUrl = pagesStdUrl;
                 let resp = await fetch(pagesStdUrl, { cache: 'no-cache' });
                 if (!resp.ok) {
                     // Try raw.githubusercontent as a fallback
                     console.warn(`std.json: GitHub Pages fetch failed (${resp.status}), falling back to raw.githubusercontent`);
                     resp = await fetch(rawStdUrl, { cache: 'no-cache' });
+                    usedStdUrl = rawStdUrl;
                 }
                 if (!resp.ok) throw new Error(`fetch std.json failed: ${resp.status}`);
                 std = await resp.json();
+                // Debug: report which std.json URL was used
+                console.log(`std.json loaded from: ${usedStdUrl}`);
             } catch (e) {
                 console.error('std.json の取得に失敗:', e);
                 // フォールバック: 薄い GSI 風に戻す
