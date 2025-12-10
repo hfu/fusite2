@@ -379,8 +379,17 @@
             let mergedLayers = [];
 
             let std;
+            // Try fetching std.json from the project's GitHub Pages (preferred),
+            // then fall back to raw.githubusercontent if Pages is not available.
+            const pagesStdUrl = 'https://optgeo.github.io/bvmap-overdrive/std.json';
+            const rawStdUrl = 'https://raw.githubusercontent.com/optgeo/bvmap-overdrive/main/docs/std.json';
             try {
-                const resp = await fetch('https://raw.githubusercontent.com/optgeo/bvmap-overdrive/main/docs/std.json');
+                let resp = await fetch(pagesStdUrl, { cache: 'no-cache' });
+                if (!resp.ok) {
+                    // Try raw.githubusercontent as a fallback
+                    console.warn(`std.json: GitHub Pages fetch failed (${resp.status}), falling back to raw.githubusercontent`);
+                    resp = await fetch(rawStdUrl, { cache: 'no-cache' });
+                }
                 if (!resp.ok) throw new Error(`fetch std.json failed: ${resp.status}`);
                 std = await resp.json();
             } catch (e) {

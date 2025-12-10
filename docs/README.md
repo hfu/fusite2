@@ -22,7 +22,7 @@
 - **ベクトルタイル**: `https://tunnel.optgeo.org/martin/bvmap-overdrive/{z}/{x}/{y}`
 - **エンコーディング**: `mlt`
 - **ズーム範囲**: 4-16
-- **スタイル**: `https://raw.githubusercontent.com/optgeo/bvmap-overdrive/main/docs/std.json` を取得してレイヤ/背景を統合
+- **スタイル**: GitHub Pages に公開されている `std.json` を優先して取得（例: `https://optgeo.github.io/bvmap-overdrive/std.json`）。Pages が利用できない場合は `https://raw.githubusercontent.com/optgeo/bvmap-overdrive/main/docs/std.json` をフォールバックとして使用します。
 - **背景**: `std.json` の `background` が存在すれば採用、なければ既定背景を使用
 - **陰影**: レイヤ統合時に「行政区画（AdmArea）」の直後へ挿入（見つからない場合は背景直後）
 
