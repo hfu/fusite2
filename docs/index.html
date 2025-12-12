@@ -336,29 +336,25 @@
          * Multidirectional hillshade theme style
          */
         function buildMultidirectionalStyle(style) {
-            // Helper function to create a hillshade layer with specific illumination direction
-            function createHillshadeLayer(direction) {
-                return {
-                    id: `hillshade-${direction}`,
+            // Single hillshade layer using MapLibre's 'multidirectional' method.
+            // This uses the original color arrays and parameters that were
+            // present before the 'Vivid' preset was applied.
+            style.layers = [
+                getBackgroundLayer(),
+                {
+                    id: 'multidirectional-hillshade',
                     type: 'hillshade',
                     source: 'hillshadeSource',
                     paint: {
+                        'hillshade-method': 'multidirectional',
+                        'hillshade-highlight-color': ['#FF4000', '#FFFF00', '#40ff00', '#00FF80'],
+                        'hillshade-shadow-color': ['#00bfff', '#0000ff', '#bf00ff', '#FF0080'],
+                        'hillshade-illumination-direction': [270, 315, 0, 45],
+                        'hillshade-illumination-altitude': [30, 30, 30, 30],
                         'hillshade-exaggeration': 0.3,
-                        'hillshade-shadow-color': 'hsl(39, 21%, 33%)',
-                        'hillshade-illumination-direction': direction,
                         'hillshade-illumination-anchor': 'viewport'
                     }
-                };
-            }
-
-            // Multiple hillshade layers with different light directions
-            // to create a multidirectional effect
-            style.layers = [
-                getBackgroundLayer(),
-                createHillshadeLayer(0),
-                createHillshadeLayer(90),
-                createHillshadeLayer(180),
-                createHillshadeLayer(270)
+                }
             ];
 
             style.sky = getDefaultSkyConfig();
