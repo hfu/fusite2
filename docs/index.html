@@ -32,6 +32,7 @@
                 <option value="gsi">GSI</option>
                 <option value="contour">等高線</option>
                 <option value="lineage">元データ</option>
+                <option value="multidirectional">多重光源</option>
             </select>
         </div>
         
@@ -191,6 +192,7 @@
                 'gsi': '国土地理院の標高データと基盤地図を表示',
                 'gsi-ortho': '国土地理院のシームレス写真タイルと標高データを表示',
                 'lineage': '地形に対応した Lineage 画像タイルを表示（terrain に "-lineage" を付加したタイル）',
+                'multidirectional': '複数の光源方向による多重光源陰影を表示',
                 'osm': '国土地理院の標高データを Terrarium 形式で可視化'
             };
 
@@ -260,6 +262,8 @@
                 return buildGsiOrthoStyle(style);
             } else if (theme === 'contour') {
                 return buildContourStyle(style, terrainTiles[0]);
+            } else if (theme === 'multidirectional') {
+                return buildMultidirectionalStyle(style);
             } else if (theme === 'lineage') {
                 // Attempt to fetch the TileJSON that explicitly lists lineage
                 // imagery tiles (e.g. /martin/iwaki-lineage). If that fails,
@@ -326,6 +330,65 @@
 
             // Default to osm
             return buildOsmStyle(style);
+        }
+
+        /**
+         * Multidirectional hillshade theme style
+         */
+        function buildMultidirectionalStyle(style) {
+            // Multiple hillshade layers with different light directions
+            // to create a multidirectional effect
+            style.layers = [
+                getBackgroundLayer(),
+                {
+                    id: 'hillshade-0',
+                    type: 'hillshade',
+                    source: 'hillshadeSource',
+                    paint: {
+                        'hillshade-exaggeration': 0.3,
+                        'hillshade-shadow-color': 'hsl(39, 21%, 33%)',
+                        'hillshade-illumination-direction': 0,
+                        'hillshade-illumination-anchor': 'viewport'
+                    }
+                },
+                {
+                    id: 'hillshade-90',
+                    type: 'hillshade',
+                    source: 'hillshadeSource',
+                    paint: {
+                        'hillshade-exaggeration': 0.3,
+                        'hillshade-shadow-color': 'hsl(39, 21%, 33%)',
+                        'hillshade-illumination-direction': 90,
+                        'hillshade-illumination-anchor': 'viewport'
+                    }
+                },
+                {
+                    id: 'hillshade-180',
+                    type: 'hillshade',
+                    source: 'hillshadeSource',
+                    paint: {
+                        'hillshade-exaggeration': 0.3,
+                        'hillshade-shadow-color': 'hsl(39, 21%, 33%)',
+                        'hillshade-illumination-direction': 180,
+                        'hillshade-illumination-anchor': 'viewport'
+                    }
+                },
+                {
+                    id: 'hillshade-270',
+                    type: 'hillshade',
+                    source: 'hillshadeSource',
+                    paint: {
+                        'hillshade-exaggeration': 0.3,
+                        'hillshade-shadow-color': 'hsl(39, 21%, 33%)',
+                        'hillshade-illumination-direction': 270,
+                        'hillshade-illumination-anchor': 'viewport'
+                    }
+                }
+            ];
+
+            style.sky = getDefaultSkyConfig();
+
+            return style;
         }
 
         /**
