@@ -336,54 +336,29 @@
          * Multidirectional hillshade theme style
          */
         function buildMultidirectionalStyle(style) {
+            // Helper function to create a hillshade layer with specific illumination direction
+            function createHillshadeLayer(direction) {
+                return {
+                    id: `hillshade-${direction}`,
+                    type: 'hillshade',
+                    source: 'hillshadeSource',
+                    paint: {
+                        'hillshade-exaggeration': 0.3,
+                        'hillshade-shadow-color': 'hsl(39, 21%, 33%)',
+                        'hillshade-illumination-direction': direction,
+                        'hillshade-illumination-anchor': 'viewport'
+                    }
+                };
+            }
+
             // Multiple hillshade layers with different light directions
             // to create a multidirectional effect
             style.layers = [
                 getBackgroundLayer(),
-                {
-                    id: 'hillshade-0',
-                    type: 'hillshade',
-                    source: 'hillshadeSource',
-                    paint: {
-                        'hillshade-exaggeration': 0.3,
-                        'hillshade-shadow-color': 'hsl(39, 21%, 33%)',
-                        'hillshade-illumination-direction': 0,
-                        'hillshade-illumination-anchor': 'viewport'
-                    }
-                },
-                {
-                    id: 'hillshade-90',
-                    type: 'hillshade',
-                    source: 'hillshadeSource',
-                    paint: {
-                        'hillshade-exaggeration': 0.3,
-                        'hillshade-shadow-color': 'hsl(39, 21%, 33%)',
-                        'hillshade-illumination-direction': 90,
-                        'hillshade-illumination-anchor': 'viewport'
-                    }
-                },
-                {
-                    id: 'hillshade-180',
-                    type: 'hillshade',
-                    source: 'hillshadeSource',
-                    paint: {
-                        'hillshade-exaggeration': 0.3,
-                        'hillshade-shadow-color': 'hsl(39, 21%, 33%)',
-                        'hillshade-illumination-direction': 180,
-                        'hillshade-illumination-anchor': 'viewport'
-                    }
-                },
-                {
-                    id: 'hillshade-270',
-                    type: 'hillshade',
-                    source: 'hillshadeSource',
-                    paint: {
-                        'hillshade-exaggeration': 0.3,
-                        'hillshade-shadow-color': 'hsl(39, 21%, 33%)',
-                        'hillshade-illumination-direction': 270,
-                        'hillshade-illumination-anchor': 'viewport'
-                    }
-                }
+                createHillshadeLayer(0),
+                createHillshadeLayer(90),
+                createHillshadeLayer(180),
+                createHillshadeLayer(270)
             ];
 
             style.sky = getDefaultSkyConfig();
